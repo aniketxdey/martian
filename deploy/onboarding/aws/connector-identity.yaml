@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Identity for the Martian connector when it runs on ECS Fargate in your tooling account.
+  The connector assumes the MartianAccess role in each member account; it needs no other
+  AWS permissions. (On EKS, attach the same assume-role policy to an IRSA/Pod Identity role.)
+
+Parameters:
+  MemberRoleName:
+    Type: String
+    Default: MartianAccess
+
+Resources:
+  ConnectorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MartianConnector
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: assume-member-roles
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !Sub arn:${AWS::Partition}:iam::*:role/${MemberRoleName}
+
+Outputs:
+  ConnectorPrincipalArn:
+    Value: !GetAtt ConnectorRole.Arn

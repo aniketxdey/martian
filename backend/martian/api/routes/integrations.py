@@ -301,20 +301,21 @@ async def create_connector(
         target_id=str(c.id),
         summary=f"created connector {c.name}",
     )
-    gw = get_settings().gateway_url.replace("http://", "ws://").replace("https://", "wss://").rstrip("/")
+    cfg = get_settings()
+    gw = cfg.public_connector_url
     return {
         "id": str(c.id),
         "name": c.name,
         "token": token,
+        "gateway_url": gw,
         "install": {
             "docker": (
                 f"docker run -d --name martian-connector --restart unless-stopped "
-                f"-e MARTIAN_CONNECTOR_TOKEN={token} -e MARTIAN_GATEWAY_URL={gw}/connect "
-                f"ghcr.io/aniketxdey/martian-connector:latest"
+                f"-e MARTIAN_CONNECTOR_TOKEN={token} -e MARTIAN_GATEWAY_URL={gw} {cfg.connector_image}"
             ),
             "helm": (
-                f"helm install martian-connector oci://ghcr.io/aniketxdey/charts/martian-connector "
-                f"--set token={token} --set gatewayUrl={gw}/connect"
+                f"helm install martian-connector {cfg.connector_chart} --namespace martian --create-namespace "
+                f"--set token={token} --set gatewayUrl={gw}"
             ),
         },
         "note": "The token is shown once. Store it in your secret manager.",

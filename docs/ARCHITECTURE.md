@@ -81,3 +81,11 @@ run on their own.
   same tool contracts, so the whole product runs without cloud accounts.
 - Without `ANTHROPIC_API_KEY` the chat agent falls back to a deterministic offline
   planner over the same tools (useful for demos and tests).
+
+## Deployment
+
+Containers for every service, docker compose for a single host, and Terraform for AWS
+(ECS Fargate, RDS, ALB with WAF, KMS, CloudFront) live in `deploy/` and the service
+directories. Customer‑side setup uses a Helm chart for the connector, plus
+CloudFormation, Azure and GCP scripts for least‑privilege access. See
+[DEPLOYMENT.md](DEPLOYMENT.md).

@@ -35,6 +35,7 @@ martian-api = "martian.api.main:run"
 martian-worker = "martian.jobs.worker:run"
 martian-forecast = "martian.forecast.server:run"
 martian-seed = "martian.seed:run"
+martian-migrate = "martian.db.migrate:run"
 
 [build-system]
 requires = ["hatchling"]

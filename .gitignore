@@ -8,3 +8,7 @@ backend/.venv/
 # mcp
 mcp/node_modules/
 mcp/dist/
+
+# local env
+.env
+dist-live/

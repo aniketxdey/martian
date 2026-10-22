@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import quote
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,15 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://martian_app:martian@localhost:5432/martian"
     # Owner role used by migrations only.
     migration_database_url: str | None = None
+    # Alternative to the URLs: parts injected separately (e.g. ECS secrets from RDS-managed
+    # credentials). When db_host is set, the URLs are built from these with proper escaping.
+    db_host: str | None = None
+    db_port: int = 5432
+    db_name: str = "martian"
+    db_app_user: str = "martian_app"
+    db_app_password: str | None = None
+    db_owner_user: str | None = None
+    db_owner_password: str | None = None
 
     # Public URLs and CORS.
     web_origin: str = "http://localhost:5173"
@@ -35,6 +45,20 @@ class Settings(BaseSettings):
     gateway_url: str = "http://localhost:8787"
     forecast_url: str = "http://localhost:8790/mcp"
 
+    # What the console tells customers to install (pin to a released version in production).
+    connector_image: str = "ghcr.io/aniketxdey/martian-connector:latest"
+    connector_chart: str = "oci://ghcr.io/aniketxdey/charts/martian-connector"
+    # Public WebSocket URL connectors dial (e.g. wss://connect.martian-ai.com/connect).
+    # Defaults to the internal gateway URL, which only works for local development.
+    connector_gateway_url: str | None = None
+
+    @property
+    def public_connector_url(self) -> str:
+        if self.connector_gateway_url:
+            return self.connector_gateway_url
+        base = self.gateway_url.replace("http://", "ws://").replace("https://", "wss://").rstrip("/")
+        return f"{base}/connect"
+
     # LLM.
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     anthropic_model: str = "claude-sonnet-5-5"
@@ -49,6 +73,27 @@ class Settings(BaseSettings):
 
     # Demo tenant bootstrap.
     seed_demo: bool = False
+
+    @field_validator(
+        "anthropic_api_key", "workos_api_key", "workos_client_id", "encryption_key", "kms_key_id"
+    )
+    @classmethod
+    def _unset_is_none(cls, v: str | None) -> str | None:
+        # Secret placeholders ("unset", or empty from compose) mean "not configured".
+        return None if v is None or v.strip() in {"", "unset"} else v
+
+    @model_validator(mode="after")
+    def _urls_from_parts(self) -> Settings:
+        if self.db_host:
+
+            def url(user: str, pw: str | None) -> str:
+                auth = quote(user, safe="") + (f":{quote(pw, safe='')}" if pw else "")
+                return f"postgresql+psycopg://{auth}@{self.db_host}:{self.db_port}/{self.db_name}"
+
+            self.database_url = url(self.db_app_user, self.db_app_password)
+            if self.db_owner_user:
+                self.migration_database_url = url(self.db_owner_user, self.db_owner_password)
+        return self
 
     @property
     def is_production(self) -> bool:

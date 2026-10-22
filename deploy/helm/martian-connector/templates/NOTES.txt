@@ -1,0 +1,4 @@
+Martian connector installed. It dials {{ .Values.gatewayUrl }} and needs no inbound access.
+
+Check it:  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "martian-connector.fullname" . }}
+In Martian, Integrations → your connector should show "online" within a few seconds.
