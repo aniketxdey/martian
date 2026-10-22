@@ -12,18 +12,25 @@
  *
  * Env: PORT (8787), MARTIAN_API_URL, MARTIAN_INTERNAL_TOKEN
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import WebSocket, { WebSocketServer } from "ws";
 import { log } from "./core/util.js";
 import { decode, encode, type Frame } from "./tunnel/protocol.js";
+import { EgressError, tenantFetch } from "./core/egress.js";
 
 type Pending = { resolve: (m: JSONRPCMessage) => void; reject: (e: Error) => void; timer: NodeJS.Timeout };
 type Tunnel = { id: string; org: string; ws: WebSocket; alive: boolean; sessions: Set<string> };
 type Route = { type: "connector"; org_id: string; connector_id: string } | { type: "http"; org_id: string; url: string; headers: Record<string, string> };
 
 const REQUEST_TIMEOUT_MS = Number(process.env.MARTIAN_TOOL_TIMEOUT_MS ?? 30 * 60_000); // snapshots can be slow
+
+/** Constant-time `Authorization: Bearer <secret>` check (hash first so lengths match). */
+function bearerMatches(header: string | undefined, secret: string): boolean {
+  const h = (v: string) => createHash("sha256").update(v).digest();
+  return timingSafeEqual(h(header ?? ""), h(`Bearer ${secret}`));
+}
 
 export class Gateway {
   private tunnels = new Map<string, Tunnel>();
@@ -40,8 +47,14 @@ export class Gateway {
       void this.authenticate(req).then(
         (cfg) => this.wss.handleUpgrade(req, socket, head, (ws) => this.attach(ws, cfg)),
         (e) => {
-          log.warn({ err: (e as Error).message }, "connector rejected");
-          socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+          // Only a definite "no" from the API is an auth failure; anything else (API
+          // restarting, network blip) is retryable so connectors do not back off for long.
+          const status = (e as any).status as number | undefined;
+          const denied = status === 401 || status === 403 || status === 404 || (e as Error).message === "missing token";
+          log.warn({ err: (e as Error).message, status }, denied ? "connector rejected" : "connector auth unavailable");
+          socket.write(denied
+            ? "HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n"
+            : "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 2\r\nConnection: close\r\n\r\n");
           socket.destroy();
         },
       );
@@ -188,7 +201,7 @@ export class Gateway {
     if (url.pathname === "/healthz") {
       return void res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, connectors: this.tunnels.size }));
     }
-    if (req.headers.authorization !== `Bearer ${this.internalToken}`) return this.fail(res, 401, "unauthorized");
+    if (!bearerMatches(req.headers.authorization, this.internalToken)) return this.fail(res, 401, "unauthorized");
 
     const refresh = url.pathname.match(/^\/internal\/connectors\/([\w-]+)\/refresh$/);
     if (refresh && req.method === "POST") {
@@ -219,11 +232,18 @@ export class Gateway {
       const v = req.headers[h];
       if (typeof v === "string") headers[h] = v;
     }
-    const upstream = await fetch(route.url, { method: req.method, headers, body: req.method === "POST" ? await this.body(req) : undefined });
+    let upstream;
+    try {
+      upstream = await tenantFetch(route.url, { method: req.method, headers, body: req.method === "POST" ? await this.body(req) : undefined });
+    } catch (e) {
+      const blocked = e instanceof EgressError || (e as any)?.cause instanceof EgressError;
+      log.warn({ err: String((e as any)?.cause ?? e), url: route.url }, "custom MCP request refused or failed");
+      return this.fail(res, blocked ? 403 : 502, blocked ? `blocked: ${((e as any)?.cause ?? e).message}` : "custom MCP server unreachable");
+    }
     const out: Record<string, string> = {};
     upstream.headers.forEach((v, k) => { if (["content-type", "mcp-session-id"].includes(k)) out[k] = v; });
     res.writeHead(upstream.status, out);
-    if (upstream.body) for await (const chunk of upstream.body as any) res.write(chunk);
+    if (upstream.body) for await (const chunk of upstream.body) res.write(chunk);
     res.end();
   }
 

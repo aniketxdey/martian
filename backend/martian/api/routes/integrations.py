@@ -17,7 +17,15 @@ from martian.db.models import Action, Connector, Integration, Role
 from martian.security.auth import new_connector_token
 from martian.security.crypto import encrypt
 from martian.services import audit
-from martian.services.integrations import CATALOG, COMING_SOON, KINDS, aws_external_id, notify_gateway
+from martian.services.integrations import (
+    CATALOG,
+    COMING_SOON,
+    KINDS,
+    aws_external_id,
+    normalize_aws_accounts,
+    notify_gateway,
+    validate_custom_url,
+)
 from martian.services.mcp import MCPBackend
 
 router = APIRouter(tags=["integrations"])
@@ -99,6 +107,21 @@ async def get_integration(
     }
 
 
+def _check_config(kind: str, config: dict[str, Any]) -> None:
+    if kind == "aws" and "accounts" in config:
+        try:
+            config["accounts"] = normalize_aws_accounts(config["accounts"])
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    if kind == "custom" and config.get("transport") != "stdio":
+        try:
+            config["url"] = validate_custom_url(
+                config.get("url"), allow_private=get_settings().allow_private_egress
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+
 class CreateIntegration(BaseModel):
     kind: str
     name: str | None = None
@@ -114,6 +137,7 @@ async def create_integration(
 ) -> dict:
     if body.kind not in KINDS:
         raise HTTPException(400, f"unknown integration kind {body.kind}")
+    _check_config(body.kind, body.config)
     connectors = await _connectors(s, p.org_id)
     connector_id = body.connector_id
     if body.kind != "custom" or body.config.get("transport") == "stdio":
@@ -166,6 +190,8 @@ async def update_integration(
     i = await s.get(Integration, integration_id)
     if i is None:
         raise HTTPException(404, "integration not found")
+    if body.config is not None:
+        _check_config(i.kind, body.config)
     changes = body.model_dump(exclude_none=True, exclude={"secrets"})
     for k, v in changes.items():
         setattr(i, k, v)

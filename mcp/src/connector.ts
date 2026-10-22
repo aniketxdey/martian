@@ -29,6 +29,7 @@ export class Connector {
   private sessions = new Map<string, Session>();
   private sandbox: boolean;
   private attempt = 0;
+  private authFailed = false;
   private stopped = false;
   connected = false;
 
@@ -63,14 +64,19 @@ export class Connector {
         log.warn({ err: e }, "bad frame");
       }
     });
-    ws.on("unexpected-response", (_req, res) => log.error({ status: res.statusCode }, "gateway rejected the connector (check the token)"));
+    ws.on("unexpected-response", (_req, res) => {
+      this.authFailed = res.statusCode === 401;
+      if (this.authFailed) log.error({ status: res.statusCode }, "gateway rejected the connector (check the token)");
+      else log.warn({ status: res.statusCode }, "gateway unavailable; retrying");
+    });
     ws.on("error", (e) => log.warn({ err: e.message }, "gateway connection error"));
     ws.on("close", (code) => {
       this.connected = false;
       for (const [id] of this.sessions) void this.closeSession(id);
       if (this.stopped) return;
       // Exponential backoff with jitter, capped at 60s; slower after auth failures.
-      const delay = Math.min(60_000, 1000 * 2 ** this.attempt++) * (0.5 + Math.random() / 2) * (code === 4401 ? 5 : 1);
+      const delay = Math.min(60_000, 1000 * 2 ** this.attempt++) * (0.5 + Math.random() / 2) * (code === 4401 || this.authFailed ? 5 : 1);
+      this.authFailed = false;
       log.info({ code, delay: Math.round(delay) }, "gateway disconnected; reconnecting");
       setTimeout(() => this.dial(), delay);
     });

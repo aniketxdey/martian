@@ -59,6 +59,10 @@ class Settings(BaseSettings):
         base = self.gateway_url.replace("http://", "ws://").replace("https://", "wss://").rstrip("/")
         return f"{base}/connect"
 
+    # Custom MCP servers on private addresses (single-tenant installs only). Must match the
+    # gateway's MARTIAN_ALLOW_PRIVATE_EGRESS.
+    allow_private_egress: bool = False
+
     # LLM.
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     anthropic_model: str = "claude-sonnet-5-5"

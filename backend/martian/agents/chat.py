@@ -4,7 +4,7 @@
                   └─(answer)→ END      └─(rejected)→ agent
 
 The gate pauses the run with `interrupt()` whenever the model wants to call a write
-tool on an integration that is not in `auto` mode. Graph state is checkpointed in
+tool. (Integration `auto` mode applies to vetted findings only, never to chat.) Graph state is checkpointed in
 Postgres, so a pending approval survives restarts; `resume()` continues the run with
 the user's decision.
 """
@@ -40,7 +40,7 @@ from martian.agents.llm import get_chat_model
 from martian.agents.tools import AgentToolset, ToolInfo, load_toolset
 from martian.config import get_settings
 from martian.db.base import org_session, utcnow
-from martian.db.models import Action, Integration, PermissionMode
+from martian.db.models import Action
 from martian.services import audit
 
 log = structlog.get_logger()
@@ -125,15 +125,11 @@ def build_graph(org_id: uuid.UUID, toolset: AgentToolset, model=None) -> StateGr
         if not writes:
             return Command(goto="tools")
 
-        modes = await _integration_modes(
-            org_id, {toolset.info[tc["name"]].integration_id for tc in writes if tc["name"] in toolset.info}
-        )
-        needs_approval = [
-            tc
-            for tc in writes
-            if modes.get(toolset.info.get(tc["name"], ToolInfo(write=True)).integration_id)
-            != PermissionMode.auto.value
-        ]
+        # Every write the model proposes in chat waits for a person, whatever the
+        # integration's mode. `auto` covers only findings that pass the risk and savings
+        # policy (services.policy.can_auto_approve); a free-form tool call has no such
+        # assessment, and tool output can carry prompt-injected instructions.
+        needs_approval = writes
         approved_by = "auto"
         if needs_approval:
             decision = interrupt(
@@ -188,17 +184,6 @@ def build_graph(org_id: uuid.UUID, toolset: AgentToolset, model=None) -> StateGr
     g.add_edge("tools", "record")
     g.add_edge("record", "agent")
     return g
-
-
-async def _integration_modes(org_id: uuid.UUID, ids: set[str | None]) -> dict[str | None, str]:
-    ids = {i for i in ids if i}
-    if not ids:
-        return {}
-    async with org_session(org_id) as s:
-        rows = await s.execute(
-            select(Integration.id, Integration.mode).where(Integration.id.in_([uuid.UUID(i) for i in ids]))
-        )
-        return {str(i): m for i, m in rows}
 
 
 async def _record_actions(

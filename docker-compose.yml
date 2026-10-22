@@ -23,6 +23,7 @@ x-control-plane-env: &cp-env
   MARTIAN_ANTHROPIC_MODEL: ${MARTIAN_ANTHROPIC_MODEL:-claude-sonnet-5-5}
   MARTIAN_WORKOS_API_KEY: ${MARTIAN_WORKOS_API_KEY:-}
   MARTIAN_WORKOS_CLIENT_ID: ${MARTIAN_WORKOS_CLIENT_ID:-}
+  MARTIAN_ALLOW_PRIVATE_EGRESS: ${MARTIAN_ALLOW_PRIVATE_EGRESS:-false}
 
 services:
   postgres:
@@ -77,6 +78,7 @@ services:
     environment:
       PORT: "8787"
       MARTIAN_API_URL: http://api:8000
+      MARTIAN_ALLOW_PRIVATE_EGRESS: ${MARTIAN_ALLOW_PRIVATE_EGRESS:-false}
       MARTIAN_INTERNAL_TOKEN: ${MARTIAN_INTERNAL_TOKEN:-dev-internal-token-change-me}
     depends_on: [api]
     restart: unless-stopped

@@ -8,6 +8,11 @@ export type Host = { id: string; name: string; host: string; username: string; p
 /** Single-quote for POSIX shells. */
 export const sh = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
+/** Absolute paths only, so a value can never be parsed as a command-line option. */
+export const absPath = z.string().regex(/^\/[^\0\n]*$/, "must be an absolute path");
+/** systemd unit names. */
+export const unitName = z.string().regex(/^[\w@.:-]+$/, "invalid service name").refine((v) => !v.startsWith("-"), "invalid service name");
+
 export function run(h: Host, command: string, timeoutMs = 30_000): Promise<{ code: number; stdout: string; stderr: string }> {
   const keyPath = process.env.MARTIAN_SSH_KEY_PATH;
   return new Promise((resolve, reject) => {
@@ -65,6 +70,8 @@ export class SshProvider implements Provider {
   }
 
   async duplicates(h: Host, path: string, minMb = 10) {
+    if (!absPath.safeParse(path).success) throw new Error(`scan path must be absolute: ${path}`);
+    minMb = Math.max(1, Math.floor(Number(minMb) || 10));
     // Files of identical size are hashed; identical hashes are duplicates.
     const cmd = `find ${sh(path)} -xdev -type f -size +${minMb}M -printf '%s\\t%p\\n' 2>/dev/null | sort -n | ` +
       `awk -F'\\t' '{c[$1]++; p[$1]=p[$1] "\\n" $2} END {for (s in c) if (c[s]>1) print substr(p[s],2)}' | ` +
@@ -131,33 +138,33 @@ export class SshProvider implements Provider {
             return { ok: false, error: (e as Error).message };
           }
         } },
-      { name: "ssh_list_dir", title: "List directory", write: false, input: { host_id: hostId, path: z.string().default("/home") },
+      { name: "ssh_list_dir", title: "List directory", write: false, input: { host_id: hostId, path: absPath.default("/home") },
         description: "Lists files in a directory on a server.",
         run: async (a: { host_id: string; path: string }) => {
-          const r = await run(this.host(a.host_id), `ls -la --time-style='+%Y-%m-%d %H:%M' ${sh(a.path)}`);
+          const r = await run(this.host(a.host_id), `ls -la --time-style='+%Y-%m-%d %H:%M' -- ${sh(a.path)}`);
           if (r.code !== 0) throw new Error(r.stderr.trim() || "ls failed");
           return { path: a.path, files: parseLs(a.path, r.stdout) };
         } },
-      { name: "ssh_disk_usage", title: "Disk usage", write: false, input: { host_id: hostId, path: z.string().default("/") },
+      { name: "ssh_disk_usage", title: "Disk usage", write: false, input: { host_id: hostId, path: absPath.default("/") },
         description: "Largest directories under a path.",
         run: async (a: { host_id: string; path: string }) => {
-          const r = await run(this.host(a.host_id), `du -xk --max-depth=1 ${sh(a.path)} 2>/dev/null | sort -rn | head -20`, 120_000);
+          const r = await run(this.host(a.host_id), `du -xk --max-depth=1 -- ${sh(a.path)} 2>/dev/null | sort -rn | head -20`, 120_000);
           return { path: a.path, entries: r.stdout.split("\n").filter(Boolean).map((l) => { const [k, p] = l.split(/\t/); return { path: p, size: human(Number(k) * 1024) }; }) };
         } },
-      { name: "ssh_find_duplicates", title: "Find duplicate files", write: false, input: { host_id: hostId, path: z.string(), min_size_mb: z.number().int().min(1).default(10) },
+      { name: "ssh_find_duplicates", title: "Find duplicate files", write: false, input: { host_id: hostId, path: absPath, min_size_mb: z.number().int().min(1).default(10) },
         description: "Finds identical files (by SHA-256) larger than a size threshold.",
         run: (a: { host_id: string; path: string; min_size_mb: number }) => this.duplicates(this.host(a.host_id), a.path, a.min_size_mb) },
-      { name: "ssh_stop_service", title: "Stop service", write: true, input: { host_id: hostId, service: z.string().regex(/^[\w@.-]+$/) },
+      { name: "ssh_stop_service", title: "Stop service", write: true, input: { host_id: hostId, service: unitName },
         description: "Stops a systemd service. Reversible with ssh_start_service.",
         run: async (a: { host_id: string; service: string }) => {
-          const r = await run(this.host(a.host_id), `sudo -n systemctl stop ${sh(a.service)}`);
+          const r = await run(this.host(a.host_id), `sudo -n systemctl stop -- ${sh(a.service)}`);
           if (r.code !== 0) throw new Error(r.stderr.trim() || "systemctl failed");
           return { ok: true, stopped: a.service };
         } },
-      { name: "ssh_start_service", title: "Start service", write: true, input: { host_id: hostId, service: z.string().regex(/^[\w@.-]+$/) },
+      { name: "ssh_start_service", title: "Start service", write: true, input: { host_id: hostId, service: unitName },
         description: "Starts a systemd service (rollback for ssh_stop_service).",
         run: async (a: { host_id: string; service: string }) => {
-          const r = await run(this.host(a.host_id), `sudo -n systemctl start ${sh(a.service)}`);
+          const r = await run(this.host(a.host_id), `sudo -n systemctl start -- ${sh(a.service)}`);
           if (r.code !== 0) throw new Error(r.stderr.trim() || "systemctl failed");
           return { ok: true, started: a.service };
         } },

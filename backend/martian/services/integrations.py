@@ -195,3 +195,60 @@ async def notify_gateway(connector_id: uuid.UUID | None) -> None:
             )
     except httpx.HTTPError as exc:
         log.info("gateway_refresh_skipped", connector=str(connector_id), error=str(exc))
+
+
+def validate_custom_url(url: str | None, *, allow_private: bool) -> str:
+    """Early validation of a custom MCP server URL (the gateway enforces it again per request).
+
+    Hosted Martian only reaches public HTTPS endpoints; private servers belong behind a
+    connector (stdio transport) instead.
+    """
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    if not url:
+        raise ValueError("server URL is required")
+    parts = urlsplit(url.strip())
+    if parts.scheme not in ({"https", "http"} if allow_private else {"https"}):
+        raise ValueError("custom MCP servers must use https")
+    if not parts.hostname:
+        raise ValueError("server URL has no host")
+    if parts.username or parts.password:
+        raise ValueError("put credentials in the Authorization header, not the URL")
+    if not allow_private:
+        host = parts.hostname
+        if host == "localhost" or host.endswith((".localhost", ".internal", ".local")):
+            raise ValueError(f"{host} is not a public host")
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = None
+        if ip is not None and not ip.is_global:
+            raise ValueError(f"{host} is not a public address")
+    return url.strip()
+
+
+def normalize_aws_accounts(accounts: object) -> list[dict[str, str]]:
+    """Accept role ARNs or 12-digit account IDs (strings or objects); return objects."""
+    import re
+
+    if not isinstance(accounts, list):
+        raise ValueError("accounts must be a list")
+    out: list[dict[str, str]] = []
+    for a in accounts:
+        item = {"role_arn": a} if isinstance(a, str) and a.startswith("arn:") else a
+        if isinstance(item, str):
+            item = {"account_id": item}
+        if not isinstance(item, dict):
+            raise ValueError(f"invalid account {a!r}")
+        arn = item.get("role_arn")
+        if arn:
+            m = re.fullmatch(r"arn:aws[a-z-]*:iam::(\d{12}):role/[\w+=,.@/-]+", arn)
+            if not m:
+                raise ValueError(f"{arn} is not an IAM role ARN")
+            item = {**item, "account_id": m.group(1)}
+        elif not re.fullmatch(r"\d{12}", str(item.get("account_id", ""))):
+            raise ValueError(f"{a!r} is not a role ARN or 12-digit account ID")
+        item.pop("external_id", None)  # always derived from the organization
+        out.append(item)
+    return out

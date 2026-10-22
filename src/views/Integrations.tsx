@@ -229,7 +229,7 @@ export const Integrations = ({
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3">
-                <Button size="sm" className="h-[38px]" onClick={() => void test()}>Test connection</Button>
+                <Button size="sm" className="h-[38px]" onClick={() => void test()}>{ig.live ? 'Save and test' : 'Test connection'}</Button>
                 {testing && <span className="text-[13px] text-fg-muted">Testing…</span>}
                 {!testing && tested && <span className="inline-flex items-center gap-1.5 text-[13px] text-ok"><IconCheck size={15} />Connected · access verified</span>}
                 {!testing && testError && <span className="text-[13px] text-danger">{testError}</span>}

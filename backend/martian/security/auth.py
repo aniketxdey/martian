@@ -60,3 +60,10 @@ def new_connector_token() -> tuple[str, str, str]:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def bearer_matches(header: str | None, secret: str) -> bool:
+    """Constant-time check of an `Authorization: Bearer <secret>` header."""
+    import hmac
+
+    return hmac.compare_digest((header or "").encode(), f"Bearer {secret}".encode())

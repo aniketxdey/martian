@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from martian.forecast.model import HORIZON, Predictor, recommend_capacity
+from martian.security.auth import bearer_matches
 
 mcp = FastMCP(
     "martian-forecast",
@@ -67,7 +68,7 @@ def recommend_scaling(
 class InternalAuth(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         token = os.environ.get("MARTIAN_INTERNAL_TOKEN", "dev-internal-token-change-me")
-        if request.url.path != "/healthz" and request.headers.get("authorization") != f"Bearer {token}":
+        if request.url.path != "/healthz" and not bearer_matches(request.headers.get("authorization"), token):
             return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
 

@@ -111,3 +111,40 @@ async def test_chat_offline_answers_with_savings(client, signed_in, backend, mon
     ai = [m for m in done["messages"] if m["type"] == "ai"]
     assert "Total Potential Monthly Savings" in ai[-1]["content"]
     assert done["run"] and done["run"][0]["tool"] == "list_findings"
+
+
+async def test_custom_mcp_url_must_be_public_https(client, signed_in):
+    for bad in (
+        "http://example.com/mcp",
+        "https://169.254.169.254/",
+        "https://localhost:8000/",
+        "https://10.0.0.5/mcp",
+    ):
+        r = await client.post("/integrations", json={"kind": "custom", "name": "x", "config": {"url": bad}})
+        assert r.status_code == 400, bad
+    r = await client.post(
+        "/integrations",
+        json={
+            "kind": "custom",
+            "name": "CMDB",
+            "mode": "read",
+            "config": {"url": "https://mcp.example.com/mcp"},
+        },
+    )
+    assert r.status_code == 201
+
+
+async def test_aws_accounts_are_validated_and_normalized(client, signed_in, backend):
+    r = await client.get("/integrations")
+    aws = next(i for i in r.json()["integrations"] if i["kind"] == "aws")
+    bad = await client.patch(f"/integrations/{aws['id']}", json={"config": {"accounts": ["[object Object]"]}})
+    assert bad.status_code == 400
+    ok = await client.patch(
+        f"/integrations/{aws['id']}",
+        json={"config": {"accounts": ["arn:aws:iam::210987654321:role/MartianAccess", "123456789012"]}},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["config"]["accounts"] == [
+        {"role_arn": "arn:aws:iam::210987654321:role/MartianAccess", "account_id": "210987654321"},
+        {"account_id": "123456789012"},
+    ]

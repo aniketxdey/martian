@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from martian.config import get_settings
 from martian.db.base import org_session, system_session
 from martian.db.models import Membership, Role, User
-from martian.security.auth import SESSION_COOKIE, read_session
+from martian.security.auth import SESSION_COOKIE, bearer_matches, read_session
 from martian.services.audit import Actor
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
@@ -91,6 +91,5 @@ async def tenant_db(p: Principal = Depends(current_principal)) -> AsyncIterator[
 
 
 def require_internal(request: Request) -> None:
-    auth = request.headers.get("authorization", "")
-    if auth != f"Bearer {get_settings().internal_token}":
+    if not bearer_matches(request.headers.get("authorization"), get_settings().internal_token):
         raise HTTPException(401, "internal token required")
