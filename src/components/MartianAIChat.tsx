@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useMartianChat, Message } from '../state/useMartianChat';
+import { PendingApproval, useChatLive } from '../state/useChatLive';
+import { LIVE } from '../api/client';
 import { RUN_STEPS } from '../data/presentation';
 import { IconArrowUp, IconCheck, IconPlus, IconShield, MartianMark } from '../ui/icons';
 import { Badge, cx } from '../ui/kit';
@@ -196,6 +198,34 @@ const MessageView = ({ msg, onQuickAction }: { msg: Message; onQuickAction: (a: 
 };
 
 const SUGGESTIONS = ['Analyze my costs', 'Security assessment', 'Optimize performance', 'Find duplicate data'];
+const LIVE_SUGGESTIONS = ['Analyze my costs', 'Which VMs are idle?', "Forecast next week's demand", 'Find duplicate data'];
+
+// Chosen once per build: the LangGraph agent over SSE when live, the scripted demo otherwise.
+const useChat = LIVE ? useChatLive : useMartianChat;
+type LiveChat = ReturnType<typeof useChatLive>;
+
+/** A write tool call paused at the approval gate. Nothing runs until someone decides. */
+function ApprovalCard({ pending, onDecide, busy }: { pending: PendingApproval; onDecide: (ok: boolean) => void; busy: boolean }) {
+  return (
+    <div role="group" aria-label="Approval needed" className="ml-[50px] flex flex-col gap-3 rounded-xl border-[1.5px] border-accent bg-accent-wash p-4 max-sm:ml-0">
+      <div className="flex items-center gap-2">
+        <Badge tone="accent">Needs your approval</Badge>
+        <span className="text-[13px] text-fg-body">Martian wants to make {pending.actions.length === 1 ? 'a change' : `${pending.actions.length} changes`}.</span>
+      </div>
+      {pending.actions.map((a) => (
+        <div key={a.tool_call_id} className="flex flex-col gap-1 rounded-[10px] border border-line bg-white px-3.5 py-3">
+          <span className="font-mono text-[13px] text-fg">{a.tool}</span>
+          {a.integration && <span className="text-xs text-fg-muted">on {a.integration}</span>}
+          <code className="whitespace-pre-wrap break-all font-mono text-xs text-fg-body">{JSON.stringify(a.args)}</code>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={() => onDecide(true)} className="h-[38px] rounded-lg border-0 bg-accent px-4 text-[13px] font-semibold text-white disabled:opacity-60">Approve and run</button>
+        <button type="button" disabled={busy} onClick={() => onDecide(false)} className="h-[38px] rounded-lg border border-line-strong bg-white px-4 text-[13px] text-fg-2 disabled:opacity-60">Decline</button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Ask Martian view model: returns the header controls and the page body,
@@ -204,7 +234,8 @@ const SUGGESTIONS = ['Analyze my costs', 'Security assessment', 'Optimize perfor
 export const useMartianChatView = ({
   prefill, onNewConversation, onOpenIntegrations,
 }: { prefill?: string; onNewConversation: () => void; onOpenIntegrations: () => void }) => {
-  const chat = useMartianChat(true);
+  const chat = useChat(true);
+  const live = LIVE ? (chat as LiveChat) : null;
   const [panelOpen, setPanelOpen] = useState(true);
 
   useEffect(() => { if (prefill) chat.setInputValue(prefill); }, [prefill]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -229,6 +260,8 @@ export const useMartianChatView = ({
           <div className="min-h-0 flex-1 lg:overflow-y-auto">
           <div className="mx-auto box-border flex w-full max-w-[860px] flex-col gap-7 px-10 pb-4 pt-8 max-sm:px-4">
             {chat.messages.map((msg) => <MessageView key={msg.id} msg={msg} onQuickAction={chat.handleQuickAction} />)}
+            {live?.pending && <ApprovalCard pending={live.pending} busy={chat.isTyping} onDecide={(ok) => void live.decide(ok)} />}
+            {live?.error && <p role="alert" className="m-0 ml-[50px] rounded-[10px] border border-danger-soft bg-white px-3.5 py-3 text-[13px] text-danger max-sm:ml-0">{live.error}</p>}
             {chat.isTyping && (
               <div className="flex items-center gap-3.5 text-sm text-fg-muted"><AgentAvatar />Martian is thinking · dispatching agents</div>
             )}
@@ -251,7 +284,7 @@ export const useMartianChatView = ({
                   className="w-full resize-none border-0 bg-transparent text-[15px] leading-normal text-fg outline-none"
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="rounded-md bg-chip px-2 py-1 font-mono text-xs text-fg-body">Scope: All environments · read-only</span>
+                  <span className="rounded-md bg-chip px-2 py-1 font-mono text-xs text-fg-body">Scope: All environments · {live ? 'writes need approval' : 'read-only'}</span>
                   <div className="flex items-center gap-2.5">
                     <span className="font-mono text-xs text-fg-faint">↵ to send</span>
                     <button type="submit" aria-label="Send" disabled={chat.isTyping} className="flex h-10 w-10 items-center justify-center rounded-[10px] border-0 bg-accent text-white disabled:opacity-60">
@@ -261,7 +294,7 @@ export const useMartianChatView = ({
                 </div>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((s) => (
+                {(live ? LIVE_SUGGESTIONS : SUGGESTIONS).map((s) => (
                   <button key={s} type="button" onClick={() => chat.setInputValue(s)} className="min-h-[34px] rounded-full border border-line bg-canvas px-3 text-[13px] text-fg-body">
                     {s}
                   </button>
@@ -276,9 +309,30 @@ export const useMartianChatView = ({
           <aside aria-label="Agent run" className="box-border flex min-w-0 max-w-full flex-[1_1_320px] flex-col gap-5 border-l border-line bg-canvas p-6 lg:w-[340px] lg:flex-none lg:overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="m-0 text-[15px] font-semibold">Agent run</h2>
-              {chat.isTyping ? <Badge tone="accent">Running</Badge> : hasRun ? <Badge tone="ok">Completed · 11s</Badge> : <Badge tone="neutral">Idle</Badge>}
+              {chat.isTyping ? <Badge tone="accent">Running</Badge>
+                : live?.pending ? <Badge tone="accent">Waiting for approval</Badge>
+                : hasRun ? <Badge tone="ok">Completed · {live ? `${live.runSeconds ?? 0}s` : '11s'}</Badge> : <Badge tone="neutral">Idle</Badge>}
             </div>
-            {hasRun ? (
+            {live && hasRun ? (
+              live.run.length === 0 ? (
+                <p className="m-0 text-sm leading-normal text-fg-muted">{chat.isTyping ? 'Planning…' : 'Answered without calling tools.'}</p>
+              ) : (
+                <ol className="m-0 flex list-none flex-col p-0">
+                  {live.run.map((s, i) => (
+                    <li key={s.id ?? `${s.tool}-${i}`} className="flex gap-3 py-2.5">
+                      <span className={cx('mt-px flex h-5 w-5 flex-none items-center justify-center rounded-full text-white', s.status === 'done' ? 'bg-ok' : s.status === 'failed' ? 'bg-danger' : 'bg-[#C9CBD0]')}>
+                        <IconCheck size={12} strokeWidth={3} />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-medium">{s.title}</span>
+                        <span className="break-all font-mono text-xs text-fg-muted">{s.detail}</span>
+                      </div>
+                      <span className="font-mono text-xs text-fg-faint">{s.status === 'pending' ? '…' : s.seconds != null ? `${s.seconds}s` : s.status}</span>
+                    </li>
+                  ))}
+                </ol>
+              )
+            ) : hasRun ? (
               <ol className="m-0 flex list-none flex-col p-0">
                 {RUN_STEPS.map((s) => (
                   <li key={s.title} className="flex gap-3 py-2.5">
@@ -299,13 +353,14 @@ export const useMartianChatView = ({
             <div className="flex flex-col gap-2.5">
               <h3 className="m-0 text-[13px] font-semibold text-fg-body">Integrations used</h3>
               <div className="flex flex-wrap gap-1.5 font-mono text-xs">
-                {['aws', 'azure', 'gcp', 'vcenter'].map((x) => (
+                {(live ? [...new Set(live.run.map((s) => s.tool.split('_')[0]).filter((x) => ['aws', 'azure', 'gcp', 'vcenter', 'ssh', 'forecast'].includes(x)))] : ['aws', 'azure', 'gcp', 'vcenter']).map((x) => (
                   <button key={x} type="button" onClick={onOpenIntegrations} className="rounded-md border border-line bg-white px-2 py-[5px] text-fg-2">{x}</button>
                 ))}
               </div>
             </div>
             <p className="m-0 flex gap-2.5 rounded-[10px] border border-line bg-white px-3.5 py-3 text-[13px] leading-normal text-fg-body">
-              <IconShield size={16} color="#15803D" className="mt-0.5 flex-none" />Read-only run. No resources were changed.
+              <IconShield size={16} color="#15803D" className="mt-0.5 flex-none" />
+              {live ? 'Write tools pause for approval. Every call is recorded in the audit log.' : 'Read-only run. No resources were changed.'}
             </p>
           </aside>
         )}

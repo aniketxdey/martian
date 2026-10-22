@@ -123,6 +123,23 @@ COMING_SOON: list[dict[str, Any]] = [
 KINDS = {c["kind"]: c for c in CATALOG}
 
 
+def aws_external_id(org_id: uuid.UUID) -> str:
+    """ExternalId customers put in their IAM role trust policy (confused-deputy protection).
+
+    One per organization, so a role created for one Martian customer cannot be assumed on
+    behalf of another even if its ARN leaks.
+    """
+    return f"martian-{org_id}"
+
+
+def aws_config_with_external_id(org_id: uuid.UUID, config: dict[str, Any]) -> dict[str, Any]:
+    accounts = [
+        {**a, "external_id": aws_external_id(org_id)} if isinstance(a, dict) and a.get("role_arn") else a
+        for a in config.get("accounts", [])
+    ]
+    return {**config, "accounts": accounts}
+
+
 async def connector_config(s: AsyncSession, connector: Connector) -> list[dict[str, Any]]:
     """Integrations served by this connector, with secrets the connector may receive.
 
@@ -143,6 +160,8 @@ async def connector_config(s: AsyncSession, connector: Connector) -> list[dict[s
             "config": i.config or {},
             "secrets": decrypt_json(i.secrets_ciphertext),
         }
+        if i.kind == "aws":
+            entry["config"] = aws_config_with_external_id(i.org_id, entry["config"])
         if i.kind == "ssh":
             servers = (await s.execute(select(Server).where(Server.integration_id == i.id))).scalars()
             entry["config"] = {

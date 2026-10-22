@@ -17,7 +17,7 @@ from martian.db.models import Action, Connector, Integration, Role
 from martian.security.auth import new_connector_token
 from martian.security.crypto import encrypt
 from martian.services import audit
-from martian.services.integrations import CATALOG, COMING_SOON, KINDS, notify_gateway
+from martian.services.integrations import CATALOG, COMING_SOON, KINDS, aws_external_id, notify_gateway
 from martian.services.mcp import MCPBackend
 
 router = APIRouter(tags=["integrations"])
@@ -47,6 +47,7 @@ def _integration(i: Integration, connectors: dict[uuid.UUID, Connector]) -> dict
         if c
         else None,
         "config": {k: v for k, v in (i.config or {}).items() if k not in {"password", "authorization"}},
+        "external_id": aws_external_id(i.org_id) if i.kind == "aws" else None,
         "has_secrets": bool(i.secrets_ciphertext),
         "tools": [{**t, "enabled": t["name"] not in (i.disabled_tools or [])} for t in (i.tools or [])],
         "last_sync_at": i.last_sync_at.isoformat() if i.last_sync_at else None,

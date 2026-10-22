@@ -110,3 +110,22 @@ async def test_rejection_leaves_finding_untouched(tenant, backend):
     assert "declined" in events[-1]["data"]["messages"][-1]["content"]
     async with org_session(tenant["org"]) as s:
         assert (await s.get(Finding, finding_id)).status == "open"
+
+
+async def test_offline_planner_routes_approve_requests_through_the_gate(tenant, backend):
+    """Without an API key, "approve ..." still reaches approve_finding and pauses for a person."""
+    finding_id, thread_id = await _setup(tenant, backend)
+    user = {"user_id": str(await _owner(tenant)), "role": "owner", "email": "owner"}
+    events = await _events(
+        run_turn(
+            tenant["org"],
+            thread_id,
+            user,
+            message="Approve the idle EC2 instances",
+            model=OfflinePlanner(),
+            include_mcp=False,
+        )
+    )
+    pending = events[-1]["data"]["pending_approval"]
+    assert pending["actions"][0]["tool"] == "approve_finding"
+    assert pending["actions"][0]["args"]["finding_id"] == str(finding_id)

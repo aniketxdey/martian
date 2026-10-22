@@ -1,5 +1,7 @@
 import React, { useCallback, useState } from 'react';
-import { useMartian } from './state/useMartian';
+import { LIVE } from './api/client';
+import { useMockData } from './state/useMockData';
+import { useLiveData } from './state/useLiveData';
 import { AppShell, TopBarTools, ViewKey, WastePill } from './shell/AppShell';
 import { Login } from './views/Login';
 import { Overview } from './views/Overview';
@@ -16,8 +18,11 @@ const TITLES: Record<ViewKey, string> = {
   setup: 'Settings',
 };
 
+// Chosen once per build: the Martian API when VITE_API_URL is set, demo data otherwise.
+const useData = LIVE ? useLiveData : useMockData;
+
 const MartianAIEnterprise = () => {
-  const m = useMartian();
+  const m = useData();
 
   // UI-only: lets Infrastructure pre-fill a question, and "New conversation" reset the chat.
   const [chatKey, setChatKey] = useState(0);
@@ -33,7 +38,7 @@ const MartianAIEnterprise = () => {
   }
 
   const view = (TITLES[m.currentView as ViewKey] ? m.currentView : 'dashboard') as ViewKey;
-  const waste = m.discoveryData?.summary?.wasteIdentified ?? 0;
+  const waste = m.summary?.wasteIdentified ?? 0;
   const dismissError = () => m.setError('');
 
   if (view === 'chat') {
@@ -69,7 +74,7 @@ const MartianAIEnterprise = () => {
       onDismissError={dismissError}
     >
       {view === 'dashboard' && <Overview m={m} onAsk={() => navigate('chat')} />}
-      {view === 'infrastructure' && <Infrastructure onAskAbout={askAbout} />}
+      {view === 'infrastructure' && <Infrastructure topology={m.topology} onAskAbout={askAbout} />}
       {view === 'integrations' && <Integrations machines={m.physicalMachines} onOpenSettings={() => navigate('setup')} />}
       {view === 'setup' && <Settings m={m} onOpenIntegrations={() => navigate('integrations')} />}
     </AppShell>

@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import type { Martian } from '../state/useMartian';
-import { AGENT_ACTIVITY, FINDING_DETAILS } from '../data/presentation';
+import React, { useEffect, useState } from 'react';
+import type { AppData } from '../state/useMockData';
+import type { UiFinding } from '../state/types';
 import { IconCheck, IconRefresh } from '../ui/icons';
 import { Badge, Button, Card, Drawer, Stat } from '../ui/kit';
 import { Page } from '../shell/AppShell';
-
-type Optimization = { id: string; title: string; description: string; impact: number; difficulty: string; timeToImplement: string };
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const shortTime = (t: string) => t.replace('minutes', 'min').replace('minute', 'min');
@@ -15,43 +13,34 @@ const greeting = () => {
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 };
 
-export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
-  const data = m.discoveryData;
-  const summary = data?.summary;
-  const optimizations: Optimization[] = data?.optimizations ?? [];
+export const Overview = ({ m, onAsk }: { m: AppData; onAsk: () => void }) => {
+  const summary = m.summary;
+  const rows: UiFinding[] = m.findings;
 
-  // UI-only: remember approved findings so they stay visible as "Applied"
-  // after optimizeResource() removes them from discoveryData.
-  const [applied, setApplied] = useState<Record<string, Optimization>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [scannedAt, setScannedAt] = useState(() => Date.now());
   const [scanning, setScanning] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
-
-  const rows = useMemo(() => {
-    const live = optimizations.map((o) => ({ ...o, state: m.optimizationProgress[o.id] ? 'running' : 'open' }));
-    const done = Object.values(applied)
-      .filter((o) => !optimizations.some((x) => x.id === o.id))
-      .map((o) => ({ ...o, state: 'done' }));
-    return [...live, ...done].sort((a, b) => b.impact - a.impact);
-  }, [optimizations, applied, m.optimizationProgress]);
+  useEffect(() => { if (summary?.lastScanAt) setScannedAt(new Date(summary.lastScanAt).getTime()); }, [summary?.lastScanAt]);
 
   const open = rows.filter((r) => r.state === 'open');
   const openSavings = open.reduce((n, r) => n + r.impact, 0);
-  const sel = optimizations.find((o) => o.id === selected) || null;
-  const selDetail = sel ? FINDING_DETAILS[sel.id] : null;
+  const sel = rows.find((o) => o.id === selected && o.state === 'open') || null;
   const mins = Math.floor((now - scannedAt) / 60000);
+  const lastScan = summary && m.live && !summary.lastScanAt ? 'never' : mins < 1 ? 'just now' : mins < 120 ? `${mins} minute${mins === 1 ? '' : 's'} ago` : `${Math.floor(mins / 60)} hours ago`;
 
-  const approve = (o: Optimization) => {
-    setApplied((prev) => ({ ...prev, [o.id]: o }));
+  const approve = (o: UiFinding) => {
     setSelected(null);
-    m.optimizeResource(o.id);
+    void m.approveFinding(o.id);
   };
 
-  const runScan = () => {
+  const runScan = async () => {
     setScanning(true);
-    setTimeout(() => { setScanning(false); setScannedAt(Date.now()); setNow(Date.now()); }, 1500);
+    await m.runScan();
+    setScanning(false);
+    setScannedAt(Date.now());
+    setNow(Date.now());
   };
 
   if (!summary) return null;
@@ -62,11 +51,11 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
         <div className="flex flex-col gap-1.5">
           <h2 className="m-0 text-[28px] font-semibold tracking-[-0.025em]">{greeting()}, Admin</h2>
           <p className="m-0 text-sm text-fg-muted">
-            Last scan {scanning ? 'running now' : mins < 1 ? 'just now' : `${mins} minute${mins === 1 ? '' : 's'} ago`} · {summary.totalAccounts} accounts · {summary.totalResources.toLocaleString('en-US')} resources
+            Last scan {scanning ? 'running now' : lastScan} · {summary.totalAccounts} accounts · {summary.totalResources.toLocaleString('en-US')} resources
           </p>
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={runScan} disabled={scanning}><IconRefresh size={16} />{scanning ? 'Scanning…' : 'Run scan'}</Button>
+          <Button onClick={() => void runScan()} disabled={scanning}><IconRefresh size={16} />{scanning ? 'Scanning…' : 'Run scan'}</Button>
           <Button variant="primary" onClick={onAsk}>Ask Martian</Button>
         </div>
       </div>
@@ -84,7 +73,7 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
           </span>
         </Card>
         <Stat label="Monthly cost" value={money(summary.monthlyCost)} sub={`Across ${summary.totalAccounts} cloud accounts`} />
-        <Stat label="Waste identified" value={money(summary.wasteIdentified)} valueClass="text-accent" sub={`${Math.round((summary.wasteIdentified / summary.monthlyCost) * 100)}% of monthly spend`} />
+        <Stat label="Waste identified" value={money(summary.wasteIdentified)} valueClass="text-accent" sub={`${summary.monthlyCost ? Math.round((summary.wasteIdentified / summary.monthlyCost) * 100) : 0}% of monthly spend`} />
         <Stat label="Resources" value={summary.totalResources.toLocaleString('en-US')} sub="Cloud and on-premises" />
       </div>
 
@@ -109,13 +98,16 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
                 </tr>
               </thead>
               <tbody>
+                {rows.length === 0 && (
+                  <tr><td colSpan={5} className="px-[22px] py-8 text-center text-sm text-fg-muted">{m.live ? 'No findings yet. Connect an integration and run a scan.' : 'No findings.'}</td></tr>
+                )}
                 {rows.map((f) => (
                   <tr key={f.id}>
                     <td className="border-b border-line-soft px-[22px] py-4">
                       <div className="flex flex-col gap-1">
                         <span className="font-medium">{f.title}</span>
                         <span className="text-[13px] text-fg-muted">{f.description}</span>
-                        <span className="font-mono text-xs text-fg-faint">{FINDING_DETAILS[f.id]?.scope}</span>
+                        <span className="font-mono text-xs text-fg-faint">{f.scope}</span>
                       </div>
                     </td>
                     <td className="whitespace-nowrap border-b border-line-soft px-3 py-4">
@@ -129,6 +121,7 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
                         <span className="inline-flex items-center gap-2 text-[13px] text-accent-ink"><span className="h-2 w-2 animate-pulse rounded-full bg-accent" />Running</span>
                       )}
                       {f.state === 'done' && <span className="inline-flex items-center gap-1.5 text-[13px] text-ok"><IconCheck size={16} />Applied</span>}
+                      {f.state === 'failed' && <span className="text-[13px] text-danger">Failed · rolled back</span>}
                     </td>
                   </tr>
                 ))}
@@ -144,7 +137,8 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
             <span className="flex items-center gap-1.5 text-xs text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok-dot" />Live</span>
           </div>
           <ol className="m-0 flex list-none flex-col p-0">
-            {AGENT_ACTIVITY.map((a, i) => (
+            {m.activity.length === 0 && <li className="border-t border-line-soft py-3 text-sm text-fg-muted">Agents will report here once the first scan runs.</li>}
+            {m.activity.map((a, i) => (
               <li key={i} className="flex gap-3 border-t border-line-soft py-3">
                 <span className={`mt-1.5 h-2 w-2 flex-none rounded-full ${a.fresh ? 'bg-accent' : 'bg-[#C9CBD0]'}`} />
                 <div className="flex flex-1 flex-col gap-[3px]">
@@ -162,10 +156,10 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
         open={!!sel}
         onClose={() => setSelected(null)}
         label="Review finding"
-        header={<span className="font-mono text-xs text-fg-muted">{selDetail?.scope}</span>}
+        header={<span className="font-mono text-xs text-fg-muted">{sel?.scope}</span>}
         footer={<>
           <Button onClick={() => setSelected(null)}>Cancel</Button>
-          <Button variant="primary" onClick={() => sel && approve(sel)}>Approve and run</Button>
+          <Button variant="primary" disabled={!sel?.automatable} onClick={() => sel && approve(sel)}>{sel && !sel.automatable ? 'Manual change only' : 'Approve and run'}</Button>
         </>}
       >
         {sel && (
@@ -178,7 +172,7 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
               {[
                 { l: 'Savings / mo', v: money(sel.impact), c: 'text-accent' },
                 { l: 'Time to apply', v: shortTime(sel.timeToImplement) },
-                { l: 'Affects', v: selDetail?.count ?? '—' },
+                { l: 'Affects', v: sel.affects || '—' },
               ].map((x) => (
                 <div key={x.l} className="flex flex-col gap-1 rounded-[10px] bg-canvas px-3.5 py-3">
                   <span className="text-xs text-fg-muted">{x.l}</span>
@@ -189,7 +183,7 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
             <div className="flex flex-col gap-3">
               <h3 className="m-0 text-sm font-semibold">What Martian will do</h3>
               <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
-                {(selDetail?.steps ?? []).map((s, i) => (
+                {sel.steps.map((s, i) => (
                   <li key={i} className="flex gap-3 text-sm leading-normal text-fg-2">
                     <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md bg-accent-wash font-mono text-xs text-accent-ink">{i + 1}</span>
                     {s}
@@ -198,7 +192,7 @@ export const Overview = ({ m, onAsk }: { m: Martian; onAsk: () => void }) => {
               </ol>
             </div>
             <p className="m-0 rounded-[10px] bg-canvas px-3.5 py-3 text-[13px] leading-[1.55] text-fg-muted">
-              Every step is logged to the audit trail with your name. Stopped resources can be restarted from Infrastructure.
+              {sel.automatable ? 'Every step is logged to the audit trail with your name and records how to undo it. If a step fails, the steps before it roll back.' : 'This change needs a person to carry it out. Martian tracks it here and confirms the savings on the next scan.'}
             </p>
           </div>
         )}

@@ -1,7 +1,7 @@
 // Integration catalog fixture (front-end only).
 // Each integration is modeled as an MCP server exposing named tools.
 
-export type IntegrationStatus = 'connected' | 'auth' | 'soon';
+export type IntegrationStatus = 'connected' | 'auth' | 'soon' | 'pending' | 'error' | 'offline' | 'disabled';
 export type PermissionMode = 'read' | 'ask' | 'auto';
 export type IntegrationCategory = 'cloud' | 'infra' | 'obs' | 'collab' | 'custom';
 
@@ -22,6 +22,11 @@ export type Integration = {
   f2?: string;
   scope?: string[];
   tools?: Tool[];
+  /** Live mode only: editable connection fields, last error and the hosting connector. */
+  fields?: { key: string; label: string; type: 'text' | 'list' | 'secret'; value: string }[];
+  lastError?: string | null;
+  externalId?: string | null;
+  connector?: { id: string; name: string; status: string; sandbox: boolean } | null;
 };
 
 const T = (name: string, desc: string, write = false): Tool => ({ name, desc, write });
