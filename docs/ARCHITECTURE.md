@@ -55,6 +55,13 @@ run on their own.
 - **Human in the loop by construction.** Write tool calls pass through an approval
   node that uses LangGraph `interrupt()`. Graph state is checkpointed in Postgres,
   so a pending approval survives restarts and deploys.
+- **Auto mode is narrow.** `auto` lets the executor apply findings that pass the
+  risk and savings policy without a person. Free‑form write calls from chat always
+  wait for approval, because tool output can carry prompt‑injected instructions.
+- **Tenant URLs never reach internal networks.** Custom MCP servers are proxied
+  through an egress guard. It allows public HTTPS only, checks the address at connect
+  time, refuses redirects, and blocks metadata, loopback and private ranges.
+  Private servers belong behind the customer's connector.
 - **Postgres is the only stateful dependency.** App data, the job queue
   (`FOR UPDATE SKIP LOCKED`) and LangGraph checkpoints share one managed database.
   Row‑level security on every tenant table backs up the app's tenant filters.
