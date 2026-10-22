@@ -39,15 +39,19 @@ async def test_overview_findings_and_topology(client, signed_in, backend):
 async def test_viewer_cannot_approve(client, signed_in, backend):
     await run_scan(signed_in["org"], backend)
     async with system_session() as s:
-        m = (await s.execute(Membership.__table__.select().where(Membership.org_id == signed_in["org"]))).first()
-        await s.execute(Membership.__table__.update().where(Membership.org_id == signed_in["org"])
-                        .values(role="viewer"))
+        m = (
+            await s.execute(Membership.__table__.select().where(Membership.org_id == signed_in["org"]))
+        ).first()
+        await s.execute(
+            Membership.__table__.update().where(Membership.org_id == signed_in["org"]).values(role="viewer")
+        )
     fid = (await client.get("/findings")).json()["findings"][0]["id"]
     r = await client.post(f"/findings/{fid}/approve")
     assert r.status_code == 403
     async with system_session() as s:
-        await s.execute(Membership.__table__.update().where(Membership.org_id == signed_in["org"])
-                        .values(role=m.role))
+        await s.execute(
+            Membership.__table__.update().where(Membership.org_id == signed_in["org"]).values(role=m.role)
+        )
 
 
 async def test_approve_via_api_queues_execution(client, signed_in, backend):
@@ -65,7 +69,9 @@ async def test_approve_via_api_queues_execution(client, signed_in, backend):
 async def test_integration_policy_and_connector_token(client, signed_in):
     lst = (await client.get("/integrations")).json()
     aws = next(i for i in lst["integrations"] if i["kind"] == "aws")
-    r = await client.patch(f"/integrations/{aws['id']}", json={"mode": "read", "disabled_tools": ["aws_stop_instances"]})
+    r = await client.patch(
+        f"/integrations/{aws['id']}", json={"mode": "read", "disabled_tools": ["aws_stop_instances"]}
+    )
     assert r.status_code == 200 and r.json()["mode"] == "read"
     created = (await client.post("/connectors", json={"name": "prod"})).json()
     assert created["token"].startswith("mct_") and "docker run" in created["install"]["docker"]
@@ -75,8 +81,11 @@ async def test_integration_policy_and_connector_token(client, signed_in):
 
 async def test_internal_endpoints_require_service_token(client, signed_in):
     assert (await client.post("/internal/connectors/auth", json={"token": "x"})).status_code == 401
-    r = await client.post("/internal/connectors/auth", json={"token": "x"},
-                          headers={"Authorization": "Bearer dev-internal-token-change-me"})
+    r = await client.post(
+        "/internal/connectors/auth",
+        json={"token": "x"},
+        headers={"Authorization": "Bearer dev-internal-token-change-me"},
+    )
     assert r.status_code == 401  # valid service token, unknown connector token
 
 
@@ -86,11 +95,16 @@ async def test_chat_offline_answers_with_savings(client, signed_in, backend, mon
     from martian.agents import chat
 
     real = chat.load_toolset
-    monkeypatch.setattr(chat, "load_toolset", lambda org_id, include_mcp=True: real(org_id, include_mcp=False))
+    monkeypatch.setattr(
+        chat, "load_toolset", lambda org_id, include_mcp=True: real(org_id, include_mcp=False)
+    )
     thread = (await client.post("/chat/threads")).json()
-    async with client.stream("POST", f"/chat/threads/{thread['id']}/messages",
-                             json={"content": "Analyze my costs"}) as r:
-        events = [line async for line in r.aiter_lines() if line.startswith("event:") or line.startswith("data:")]
+    async with client.stream(
+        "POST", f"/chat/threads/{thread['id']}/messages", json={"content": "Analyze my costs"}
+    ) as r:
+        events = [
+            line async for line in r.aiter_lines() if line.startswith("event:") or line.startswith("data:")
+        ]
     names = [e.split(": ", 1)[1] for e in events if e.startswith("event:")]
     assert "tool_start" in names and names[-1] == "done"
     done = json.loads(events[-1].split(": ", 1)[1])

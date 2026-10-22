@@ -32,8 +32,10 @@ def _admin(sql: str) -> None:
 @pytest.fixture(scope="session", autouse=True)
 def database():
     for role in ("martian_owner", "martian_app"):
-        _admin(f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') "
-               f"THEN CREATE ROLE {role} LOGIN PASSWORD 'martian'; END IF; END $$")
+        _admin(
+            f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') "
+            f"THEN CREATE ROLE {role} LOGIN PASSWORD 'martian'; END IF; END $$"
+        )
     _admin(f"DROP DATABASE IF EXISTS {DB}")
     _admin(f"CREATE DATABASE {DB} OWNER martian_owner")
     from alembic import command
@@ -61,8 +63,11 @@ async def app():
 async def client(app):
     import httpx
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver",
-                                 headers={"Origin": "http://testserver"}) as c:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+        headers={"Origin": "http://testserver"},
+    ) as c:
         yield c
 
 
@@ -77,13 +82,22 @@ async def tenant():
     suffix = uuid.uuid4().hex[:8]
     org = await create_org(f"Acme {suffix}", f"owner-{suffix}@acme.test", "correct horse battery")
     async with org_session(org.id) as s:
-        c = Connector(org_id=org.id, name="test", token_hash=hash_token(f"tok-{suffix}"), token_prefix="tok",
-                      sandbox=True, status="online")
+        c = Connector(
+            org_id=org.id,
+            name="test",
+            token_hash=hash_token(f"tok-{suffix}"),
+            token_prefix="tok",
+            sandbox=True,
+            status="online",
+        )
         s.add(c)
         await s.flush()
-        aws = Integration(org_id=org.id, kind="aws", name="AWS", connector_id=c.id, mode="ask", status="connected")
-        vc = Integration(org_id=org.id, kind="vcenter", name="vCenter", connector_id=c.id, mode="read",
-                         status="connected")
+        aws = Integration(
+            org_id=org.id, kind="aws", name="AWS", connector_id=c.id, mode="ask", status="connected"
+        )
+        vc = Integration(
+            org_id=org.id, kind="vcenter", name="vCenter", connector_id=c.id, mode="read", status="connected"
+        )
         s.add_all([aws, vc])
         await s.flush()
         ids = {"org": org.id, "connector": c.id, "aws": aws.id, "vcenter": vc.id}

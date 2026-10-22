@@ -3,15 +3,30 @@ from tests.fakes import aws_resources
 
 
 def _res(raw, integration="i1", provider="aws"):
-    return Res(integration_id=integration, provider=provider, resource_id=raw["resource_id"],
-               resource_type=raw["resource_type"], name=raw.get("name", ""), account=raw.get("account", ""),
-               region=raw.get("region", ""), state=raw.get("state", ""), monthly_cost=raw.get("monthly_cost", 0),
-               attributes=raw.get("attributes", {}), tags=raw.get("tags", {}), metrics=raw.get("metrics", {}))
+    return Res(
+        integration_id=integration,
+        provider=provider,
+        resource_id=raw["resource_id"],
+        resource_type=raw["resource_type"],
+        name=raw.get("name", ""),
+        account=raw.get("account", ""),
+        region=raw.get("region", ""),
+        state=raw.get("state", ""),
+        monthly_cost=raw.get("monthly_cost", 0),
+        attributes=raw.get("attributes", {}),
+        tags=raw.get("tags", {}),
+        metrics=raw.get("metrics", {}),
+    )
 
 
 def test_rules_produce_expected_findings():
-    findings = {f.rule: f for f in evaluate([_res(r) for r in aws_resources()],
-                                            {"web-asg": {"recommended_desired": 8, "peak_utilization": 86}})}
+    findings = {
+        f.rule: f
+        for f in evaluate(
+            [_res(r) for r in aws_resources()],
+            {"web-asg": {"recommended_desired": 8, "peak_utilization": 86}},
+        )
+    }
 
     idle = findings["idle_compute"]
     assert sorted(idle.resource_ids) == [f"i-idle{i}" for i in range(5)]  # busy and protected excluded

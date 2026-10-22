@@ -27,8 +27,16 @@ class ProposeApproval(OfflinePlanner):
         if isinstance(last, ToolMessage):
             msg = AIMessage(content=f"Result: {last.content}")
         else:
-            msg = AIMessage(content="", tool_calls=[{"name": "approve_finding", "args": {"finding_id": self.finding_id},
-                                                     "id": "call_approve_1"}])
+            msg = AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "approve_finding",
+                        "args": {"finding_id": self.finding_id},
+                        "id": "call_approve_1",
+                    }
+                ],
+            )
         return ChatResult(generations=[ChatGeneration(message=msg)])
 
 
@@ -52,7 +60,9 @@ async def _owner(tenant):
     from martian.db.models import Membership
 
     async with system_session() as s:
-        return (await s.execute(select(Membership.user_id).where(Membership.org_id == tenant["org"]))).scalar_one()
+        return (
+            await s.execute(select(Membership.user_id).where(Membership.org_id == tenant["org"]))
+        ).scalar_one()
 
 
 async def test_write_tool_pauses_then_runs_after_approval(tenant, backend):
@@ -60,8 +70,11 @@ async def test_write_tool_pauses_then_runs_after_approval(tenant, backend):
     model = ProposeApproval(finding_id=str(finding_id))
     user = {"user_id": str(await _owner(tenant)), "role": "owner", "email": "owner"}
 
-    events = await _events(run_turn(tenant["org"], thread_id, user, message="approve the idle VMs",
-                                    model=model, include_mcp=False))
+    events = await _events(
+        run_turn(
+            tenant["org"], thread_id, user, message="approve the idle VMs", model=model, include_mcp=False
+        )
+    )
     kinds = [e["event"] for e in events]
     assert "interrupt" in kinds
     pending = (await thread_view(tenant["org"], thread_id))["pending_approval"]
@@ -69,8 +82,9 @@ async def test_write_tool_pauses_then_runs_after_approval(tenant, backend):
     async with org_session(tenant["org"]) as s:
         assert (await s.get(Finding, finding_id)).status == "open"  # nothing happened yet
 
-    events = await _events(run_turn(tenant["org"], thread_id, user, resume={"approved": True},
-                                    model=model, include_mcp=False))
+    events = await _events(
+        run_turn(tenant["org"], thread_id, user, resume={"approved": True}, model=model, include_mcp=False)
+    )
     done = events[-1]["data"]
     assert done["pending_approval"] is None
     assert "approved" in done["messages"][-1]["content"]
@@ -83,8 +97,16 @@ async def test_rejection_leaves_finding_untouched(tenant, backend):
     model = ProposeApproval(finding_id=str(finding_id))
     user = {"user_id": str(uuid.uuid4()), "role": "owner", "email": "owner"}
     await _events(run_turn(tenant["org"], thread_id, user, message="go", model=model, include_mcp=False))
-    events = await _events(run_turn(tenant["org"], thread_id, user, resume={"approved": False, "comment": "not now"},
-                                    model=model, include_mcp=False))
+    events = await _events(
+        run_turn(
+            tenant["org"],
+            thread_id,
+            user,
+            resume={"approved": False, "comment": "not now"},
+            model=model,
+            include_mcp=False,
+        )
+    )
     assert "declined" in events[-1]["data"]["messages"][-1]["content"]
     async with org_session(tenant["org"]) as s:
         assert (await s.get(Finding, finding_id)).status == "open"

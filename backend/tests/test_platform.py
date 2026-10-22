@@ -32,15 +32,22 @@ async def test_scan_creates_findings_and_is_idempotent(tenant, backend):
     assert second["opened"] == 0 and second["updated"] == first["findings"]
     async with org_session(tenant["org"]) as s:
         rules = {f.rule for f in (await s.execute(select(Finding))).scalars()}
-    assert {"idle_compute", "unattached_volumes", "overprovisioned_databases", "underutilized_hosts",
-            "predictive_scaling"} <= rules
+    assert {
+        "idle_compute",
+        "unattached_volumes",
+        "overprovisioned_databases",
+        "underutilized_hosts",
+        "predictive_scaling",
+    } <= rules
 
 
 async def test_resolved_when_waste_disappears_and_dismissed_stays_dismissed(tenant, backend):
     await run_scan(tenant["org"], backend)
     async with org_session(tenant["org"]) as s:
         vols = (await s.execute(select(Finding).where(Finding.rule == "unattached_volumes"))).scalar_one()
-        db = (await s.execute(select(Finding).where(Finding.rule == "overprovisioned_databases"))).scalar_one()
+        db = (
+            await s.execute(select(Finding).where(Finding.rule == "overprovisioned_databases"))
+        ).scalar_one()
         db.status = "dismissed"
     backend.inventory["aws"] = [r for r in backend.inventory["aws"] if r["resource_type"] != "volume"]
     await run_scan(tenant["org"], backend)
@@ -57,7 +64,7 @@ async def test_approve_execute_and_rollback(tenant, backend):
         await findings.approve_finding(s, tenant["org"], f.id, actor, "owner", None)
     result = await findings.execute_finding(tenant["org"], f.id, backend)
     assert result["status"] == "applied"
-    assert ("aws_stop_instances" in [c[1] for c in backend.calls])
+    assert "aws_stop_instances" in [c[1] for c in backend.calls]
     async with org_session(tenant["org"]) as s:
         f = await s.get(Finding, f.id)
         assert f.status == "applied" and f.realized_monthly_savings == f.est_monthly_savings
@@ -72,10 +79,17 @@ async def test_approve_execute_and_rollback(tenant, backend):
 
 async def test_failed_step_rolls_back_earlier_steps(tenant):
     backend = FakeBackend()
-    backend.inventory["aws"].append({  # second database so the plan has two steps
-        "resource_id": "db-2", "resource_type": "database", "account": "111", "region": "us-east-1",
-        "monthly_cost": 500, "attributes": {"instance_class": "db.m5.xlarge", "downsize_to": "db.m5.large"},
-        "metrics": {"cpu_avg_14d": 3, "cpu_p95_14d": 9}})
+    backend.inventory["aws"].append(
+        {  # second database so the plan has two steps
+            "resource_id": "db-2",
+            "resource_type": "database",
+            "account": "111",
+            "region": "us-east-1",
+            "monthly_cost": 500,
+            "attributes": {"instance_class": "db.m5.xlarge", "downsize_to": "db.m5.large"},
+            "metrics": {"cpu_avg_14d": 3, "cpu_p95_14d": 9},
+        }
+    )
     await run_scan(tenant["org"], backend)
     async with org_session(tenant["org"]) as s:
         f = (await s.execute(select(Finding).where(Finding.rule == "overprovisioned_databases"))).scalar_one()
