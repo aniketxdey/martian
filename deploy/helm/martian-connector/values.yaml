@@ -1,0 +1,39 @@
+image:
+  repository: ghcr.io/aniketxdey/martian-connector
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# Connector token from Martian → Integrations → Add connector. Prefer existingSecret.
+token: ""
+existingSecret: ""   # secret with key MARTIAN_CONNECTOR_TOKEN
+gatewayUrl: wss://connect.martian-ai.com/connect
+sandbox: false
+
+# Cloud identity: annotate the service account for IRSA / EKS Pod Identity (AWS),
+# Azure Workload Identity or GKE Workload Identity. No cloud keys in the cluster.
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/MartianConnector
+    # azure.workload.identity/client-id: 00000000-0000-0000-0000-000000000000
+    # iam.gke.io/gcp-service-account: martian-connector@project.iam.gserviceaccount.com
+podLabels: {}
+  # azure.workload.identity/use: "true"
+
+# One replica: the gateway routes each integration to a single live session.
+replicaCount: 1
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 512Mi }
+
+# Egress-only by default. Widen if the connector must reach vCenter or SSH hosts on
+# private ranges that a default-deny cluster policy blocks.
+networkPolicy:
+  enabled: true
+  extraEgress: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

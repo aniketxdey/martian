@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Martian } from '../state/useMartian';
+import type { AppData } from '../state/useMockData';
 import { IconAlert, IconCheck, IconFile, IconFolder, IconPencil, IconPlus, IconTrash } from '../ui/icons';
 import { Badge, Button, Card, Dialog, Drawer, Field, LineTabs, fieldInput } from '../ui/kit';
 import { Page, PageHeading } from '../shell/AppShell';
@@ -17,7 +17,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   return <Badge tone="warn">Needs credentials</Badge>;
 };
 
-export const Settings = ({ m, onOpenIntegrations }: { m: Martian; onOpenIntegrations: () => void }) => {
+export const Settings = ({ m, onOpenIntegrations }: { m: AppData; onOpenIntegrations: () => void }) => {
   const [tab, setTab] = useState<Tab>('servers');
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
 
@@ -149,7 +149,7 @@ export const Settings = ({ m, onOpenIntegrations }: { m: Martian; onOpenIntegrat
             variant="primary"
             onClick={() => {
               // Same as the original "Save & Connect": connect only when IP and password are set.
-              if (editing?.ipAddress && editing?.password) m.connectToMachine(editing);
+              if (editing) void m.saveMachine(editing).then(() => { if (editing.ipAddress && (editing.password || m.live)) m.connectToMachine(editing); });
               m.setShowAddMachine(false);
               m.setSelectedMachine(null);
             }}

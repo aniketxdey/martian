@@ -1,0 +1,6 @@
+apiVersion: v2
+name: martian-connector
+description: Martian connector. Runs inside your network, dials out to Martian over TLS, and exposes your infrastructure to Martian agents as MCP tools.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

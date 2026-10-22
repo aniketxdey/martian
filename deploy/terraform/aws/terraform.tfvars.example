@@ -1,0 +1,4 @@
+env       = "prod"
+region    = "us-east-1"
+domain    = "martian-ai.com" # Route 53 hosted zone; creates app., api. and connect.
+image_tag = "REPLACE_WITH_GIT_SHA"
