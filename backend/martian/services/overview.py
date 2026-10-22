@@ -33,7 +33,9 @@ async def overview(s: AsyncSession, org_id: uuid.UUID) -> dict[str, Any]:
             select(
                 func.coalesce(func.sum(Resource.monthly_cost), 0),
                 func.count(Resource.id),
-                func.count(func.distinct(Resource.account)),
+                func.count(func.distinct(Resource.provider + ":" + Resource.account)).filter(
+                    Resource.provider.in_(["aws", "azure", "gcp"])
+                ),
             ).where(Resource.org_id == org_id)
         )
     ).one()

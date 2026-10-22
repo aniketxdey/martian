@@ -59,3 +59,11 @@ def test_host_consolidation_needs_two_hosts():
     two = one + [Res("v", "vcenter", "h2", "host", monthly_cost=900, metrics={"cpu_avg_14d": 5})]
     [f] = evaluate(two)
     assert f.rule == "underutilized_hosts" and f.plan == [] and f.est_monthly_savings == 900
+
+
+def test_multi_account_findings_are_distinct_and_target_their_account():
+    a = [_res({**r, "account": "111"}) for r in aws_resources()]
+    b = [_res({**r, "account": "222", "resource_id": r["resource_id"] + "-b"}) for r in aws_resources()]
+    idle = [f for f in evaluate(a + b) if f.rule == "idle_compute"]
+    assert len(idle) == 2 and len({f.fingerprint for f in idle}) == 2
+    assert {f.plan[0]["args"]["account"] for f in idle} == {"111", "222"}

@@ -91,10 +91,12 @@ class FindingDraft:
     steps: list[str]
     evidence: dict[str, Any]
     integration_id: str
+    # What the rule groups by (account/region, or one resource); keeps fingerprints unique and stable.
+    group: str = ""
 
     @property
     def fingerprint(self) -> str:
-        key = f"{self.rule}|{self.integration_id}|{self.scope}"
+        key = f"{self.rule}|{self.integration_id}|{self.group or self.scope}"
         return hashlib.sha256(key.encode()).hexdigest()[:40]
 
 
@@ -111,6 +113,10 @@ def _group(resources: Iterable[Res], key: Callable[[Res], tuple]) -> dict[tuple,
     for r in resources:
         groups[key(r)].append(r)
     return groups
+
+
+def _aws(account: str, region: str) -> dict[str, str]:
+    return {"region": region, "account": account} if account else {"region": region}
 
 
 def _money(v: float) -> float:
@@ -137,7 +143,7 @@ def idle_compute(resources: list[Res]) -> list[FindingDraft]:
         and r.metrics.get("cpu_p95_14d", 0) < IDLE_CPU_P95
     ]
     out = []
-    for (iid, provider, _account, region), rs in _group(
+    for (iid, provider, account, region), rs in _group(
         candidates, lambda r: (r.integration_id, r.provider, r.account, r.region)
     ).items():
         stop, start, arg = STOP_VMS[provider]
@@ -146,10 +152,15 @@ def idle_compute(resources: list[Res]) -> list[FindingDraft]:
         noun = {"aws": "EC2 instance", "azure": "Azure VM", "gcp": "Compute Engine instance"}.get(
             provider, "VM"
         )
-        base = {"region": region} if provider == "aws" else {}
+        base = (
+            ({"region": region, "account": account} if account else {"region": region})
+            if provider == "aws"
+            else {}
+        )
         out.append(
             FindingDraft(
                 rule="idle_compute",
+                group=f"{account}|{region}",
                 category="compute",
                 title={
                     "aws": "Unused EC2 instances",
@@ -208,14 +219,18 @@ def unattached_volumes(resources: list[Res]) -> list[FindingDraft]:
         and not r.protected
     ]
     out = []
-    for (iid, provider, _account, region), rs in _group(
+    for (iid, provider, account, region), rs in _group(
         candidates, lambda r: (r.integration_id, r.provider, r.account, r.region)
     ).items():
         tool, arg = DELETE_VOLUMES[provider]
         ids = sorted(r.resource_id for r in rs)
         gb = sum(float(r.attributes.get("size_gb", 0)) for r in rs)
         savings = max(0.0, sum(r.monthly_cost for r in rs) - gb * SNAPSHOT_COST_PER_GB)
-        base = {"region": region} if provider == "aws" else {}
+        base = (
+            ({"region": region, "account": account} if account else {"region": region})
+            if provider == "aws"
+            else {}
+        )
         label = (
             "EBS volumes"
             if provider == "aws"
@@ -226,6 +241,7 @@ def unattached_volumes(resources: list[Res]) -> list[FindingDraft]:
         out.append(
             FindingDraft(
                 rule="unattached_volumes",
+                group=f"{account}|{region}",
                 category="storage",
                 title="Unused storage volumes",
                 description=f"{len(rs)} unattached {label} ({gb:,.0f} GB) idle for {UNATTACHED_MIN_DAYS}+ days",
@@ -268,13 +284,14 @@ def old_snapshots(resources: list[Res]) -> list[FindingDraft]:
         and not r.protected
     ]
     out = []
-    for (iid, _account, region), rs in _group(
+    for (iid, account, region), rs in _group(
         candidates, lambda r: (r.integration_id, r.account, r.region)
     ).items():
         ids = sorted(r.resource_id for r in rs)
         out.append(
             FindingDraft(
                 rule="old_snapshots",
+                group=f"{account}|{region}",
                 category="storage",
                 title="Orphaned snapshots",
                 description=f"{len(rs)} snapshots older than {SNAPSHOT_MAX_AGE_DAYS} days not used by any image",
@@ -289,7 +306,7 @@ def old_snapshots(resources: list[Res]) -> list[FindingDraft]:
                     {
                         "integration_id": iid,
                         "tool": "aws_delete_snapshots",
-                        "args": {"region": region, "snapshot_ids": ids},
+                        "args": {**_aws(account, region), "snapshot_ids": ids},
                         "rollback": None,
                         "description": f"Delete {len(ids)} snapshots",
                     }
@@ -318,7 +335,7 @@ def overprovisioned_databases(resources: list[Res]) -> list[FindingDraft]:
         and not r.protected
     ]
     out = []
-    for (iid, _account, region), rs in _group(
+    for (iid, account, region), rs in _group(
         candidates, lambda r: (r.integration_id, r.account, r.region)
     ).items():
         plan = [
@@ -326,14 +343,14 @@ def overprovisioned_databases(resources: list[Res]) -> list[FindingDraft]:
                 "integration_id": iid,
                 "tool": "aws_modify_db_instance_class",
                 "args": {
-                    "region": region,
+                    **_aws(account, region),
                     "db_instance_id": r.resource_id,
                     "target_class": r.attributes["downsize_to"],
                 },
                 "rollback": {
                     "tool": "aws_modify_db_instance_class",
                     "args": {
-                        "region": region,
+                        **_aws(account, region),
                         "db_instance_id": r.resource_id,
                         "target_class": r.attributes.get("instance_class"),
                     },
@@ -345,6 +362,7 @@ def overprovisioned_databases(resources: list[Res]) -> list[FindingDraft]:
         out.append(
             FindingDraft(
                 rule="overprovisioned_databases",
+                group=f"{account}|{region}",
                 category="database",
                 title="Over-provisioned RDS instances",
                 description=f"{len(rs)} database instances running at <{DB_CPU_AVG:g}% capacity",
@@ -378,7 +396,7 @@ def idle_network(resources: list[Res]) -> list[FindingDraft]:
         and not r.protected
     ]
     out = []
-    for (iid, _account, region), rs in _group(
+    for (iid, account, region), rs in _group(
         candidates, lambda r: (r.integration_id, r.account, r.region)
     ).items():
         lbs = sorted(r.resource_id for r in rs if r.resource_type == "load_balancer")
@@ -389,7 +407,7 @@ def idle_network(resources: list[Res]) -> list[FindingDraft]:
                 {
                     "integration_id": iid,
                     "tool": "aws_delete_load_balancers",
-                    "args": {"region": region, "load_balancer_arns": lbs},
+                    "args": {**_aws(account, region), "load_balancer_arns": lbs},
                     "rollback": None,
                     "description": f"Delete {_plural(len(lbs), 'idle load balancer')}",
                 }
@@ -399,7 +417,7 @@ def idle_network(resources: list[Res]) -> list[FindingDraft]:
                 {
                     "integration_id": iid,
                     "tool": "aws_delete_nat_gateways",
-                    "args": {"region": region, "nat_gateway_ids": nats},
+                    "args": {**_aws(account, region), "nat_gateway_ids": nats},
                     "rollback": None,
                     "description": f"Delete {_plural(len(nats), 'idle NAT gateway')}",
                 }
@@ -407,6 +425,7 @@ def idle_network(resources: list[Res]) -> list[FindingDraft]:
         out.append(
             FindingDraft(
                 rule="idle_network",
+                group=f"{account}|{region}",
                 category="network",
                 title="Network cost optimization",
                 description="Load balancers and NAT gateways with no traffic in 14 days",
@@ -453,6 +472,7 @@ def underutilized_hosts(resources: list[Res]) -> list[FindingDraft]:
         out.append(
             FindingDraft(
                 rule="underutilized_hosts",
+                group=_provider,
                 category="compute",
                 title="VM consolidation",
                 description=f"{len(rs)} physical hosts under {HOST_CPU_AVG:g}% CPU; {removable} can be freed by consolidating VMs",
@@ -486,6 +506,7 @@ def duplicate_data(resources: list[Res]) -> list[FindingDraft]:
         out.append(
             FindingDraft(
                 rule="duplicate_data",
+                group=r.resource_id,
                 category="data",
                 title="Duplicate data",
                 description=f"{gb:,.0f} GB of duplicate files on {r.name or r.resource_id}",
@@ -530,6 +551,7 @@ def predictive_scaling(resources: list[Res], forecasts: dict[str, dict[str, Any]
         out.append(
             FindingDraft(
                 rule="predictive_scaling",
+                group=r.resource_id,
                 category="scaling",
                 title="Scale ahead of forecast demand" if up else "Right-size auto scaling group",
                 description=(
@@ -547,10 +569,14 @@ def predictive_scaling(resources: list[Res], forecasts: dict[str, dict[str, Any]
                     {
                         "integration_id": r.integration_id,
                         "tool": "aws_set_asg_desired_capacity",
-                        "args": {"region": r.region, "asg_name": r.resource_id, "desired": rec},
+                        "args": {**_aws(r.account, r.region), "asg_name": r.resource_id, "desired": rec},
                         "rollback": {
                             "tool": "aws_set_asg_desired_capacity",
-                            "args": {"region": r.region, "asg_name": r.resource_id, "desired": desired},
+                            "args": {
+                                **_aws(r.account, r.region),
+                                "asg_name": r.resource_id,
+                                "desired": desired,
+                            },
                         },
                         "description": f"Set desired capacity of {r.name} to {rec}",
                     }

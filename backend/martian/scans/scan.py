@@ -79,8 +79,33 @@ async def _forecasts(backend: ToolBackend, resources: list[Res]) -> dict[str, di
 
 async def run_scan(org_id: uuid.UUID, backend: ToolBackend, trigger: str = "schedule") -> dict[str, Any]:
     async with org_session(org_id) as s:
+        # A scan that crashed (worker died, bad data) must not look "running" forever.
+        for stale in (
+            await s.execute(select(Scan).where(Scan.org_id == org_id, Scan.status == "running"))
+        ).scalars():
+            stale.status, stale.finished_at = "failed", utcnow()
+            stale.error = stale.error or "interrupted"
+    scan_id = await _start_scan(org_id, trigger)
+    try:
+        return await _run_scan(org_id, backend, scan_id)
+    except Exception as exc:
+        async with org_session(org_id) as s:
+            row = await s.get(Scan, scan_id)
+            if row is not None:
+                row.status, row.error, row.finished_at = "failed", str(exc)[:2000], utcnow()
+        raise
+
+
+async def _start_scan(org_id: uuid.UUID, trigger: str) -> uuid.UUID:
+    async with org_session(org_id) as s:
         scan = Scan(org_id=org_id, trigger=trigger)
         s.add(scan)
+        await s.flush()
+        return scan.id
+
+
+async def _run_scan(org_id: uuid.UUID, backend: ToolBackend, scan_id: uuid.UUID) -> dict[str, Any]:
+    async with org_session(org_id) as s:
         integrations = list(
             (
                 await s.execute(
@@ -92,8 +117,6 @@ async def run_scan(org_id: uuid.UUID, backend: ToolBackend, trigger: str = "sche
                 )
             ).scalars()
         )
-        await s.flush()
-        scan_id = scan.id
 
     all_resources: list[Res] = []
     per_integration: dict[str, Any] = {}
