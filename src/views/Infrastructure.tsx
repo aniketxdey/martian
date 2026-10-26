@@ -229,7 +229,7 @@ function NodeDrawer({ id, onClose, onSelect }: { id: string | null; onClose: () 
                     <span className="min-w-0 flex-1 truncate text-fg">{k.label}</span>
                     {k.cpu != null && (
                       <span className="flex w-[90px] flex-none items-center gap-2">
-                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-line-soft"><span className="block h-full rounded-full bg-accent transition-[width] duration-700" style={{ width: `${Math.round(k.cpu)}%` }} /></span>
+                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-line-soft"><span className="block h-full rounded-full bg-accent w-full origin-left transition-transform duration-700 ease-out" style={{ transform: `scaleX(${parseFloat(`${Math.round(k.cpu)}%`) / 100})` }} /></span>
                         <span className="w-8 text-right font-mono text-11 tabular-nums text-fg-muted">{Math.round(k.cpu)}%</span>
                       </span>
                     )}
@@ -354,7 +354,7 @@ export const Infrastructure = ({ nodeId }: { nodeId?: string | null }) => {
                       {s.util != null ? (
                         <span className="flex items-center gap-2">
                           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
-                            <span className={cx('block h-full rounded-full transition-[width] duration-700', s.util < 10 ? 'bg-idle' : s.util > 78 ? 'bg-warn' : 'bg-ok')} style={{ width: `${Math.max(2, s.util)}%` }} />
+                            <span className={cx('block h-full w-full origin-left rounded-full transition-transform duration-700 ease-out', s.util < 10 ? 'bg-idle' : s.util > 78 ? 'bg-warn' : 'bg-ok')} style={{ transform: `scaleX(${Math.max(2, s.util) / 100})` }} />
                           </span>
                           <span className="w-9 text-right font-mono text-xs tabular-nums text-fg-body">{s.util}%</span>
                         </span>

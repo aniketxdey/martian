@@ -50,7 +50,7 @@ function Row({ s, now, onOpen }: { s: AgentSession; now: number; onOpen: () => v
           </span>
           {p && (
             <span className="h-1 max-w-[420px] overflow-hidden rounded-full bg-line-soft">
-              <span className="block h-full rounded-full bg-accent transition-[width] duration-700 ease-out" style={{ width: `${p.pct}%` }} />
+              <span className="block h-full rounded-full bg-accent w-full origin-left transition-transform duration-700 ease-out" style={{ transform: `scaleX(${parseFloat(`${p.pct}%`) / 100})` }} />
             </span>
           )}
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-fg-faint">

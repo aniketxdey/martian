@@ -54,7 +54,7 @@ function Routes() {
     default: view = <Overview />;
   }
   return (
-    <div className="vt-page flex min-h-0 flex-1 flex-col">
+    <div key={route.key} className="vt-page vt-enter flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<PageSkeleton />}>{view}</Suspense>
     </div>
   );

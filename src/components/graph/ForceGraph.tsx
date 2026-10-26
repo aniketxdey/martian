@@ -74,7 +74,7 @@ const NodeShape = memo(function NodeShape({ n, selected, dim, hot, show, outward
       onClick={(e) => { e.stopPropagation(); onClick(n.id); }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(n.id); } }}
     >
-      {n.pulse && <circle r={n.r + 6} fill="none" stroke={tone} strokeWidth={2} className="animate-ping origin-center" style={{ transformBox: 'fill-box', opacity: 0.35 }} />}
+      {n.pulse && <circle r={n.r + 6} fill="none" stroke={tone} strokeWidth={2} className="animate-fg-pulse" style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />}
       {(selected || hot) && <circle r={n.r + 5} fill="none" stroke="rgb(var(--c-accent))" strokeWidth={selected ? 2.5 : 1.5} opacity={selected ? 1 : 0.6} />}
       <circle
         r={n.r}

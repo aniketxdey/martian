@@ -56,10 +56,13 @@ export default {
       keyframes: {
         'fade-up': { from: { opacity: '0', transform: 'translateY(4px)' }, to: { opacity: '1', transform: 'none' } },
         flow: { to: { strokeDashoffset: '-24' } },
+        'fg-pulse': { '0%': { transform: 'scale(1)', opacity: '0.5' }, '100%': { transform: 'scale(1.35)', opacity: '0' } },
       },
       animation: {
         'fade-up': 'fade-up 240ms ease-out both',
-        flow: 'flow 1.2s linear infinite',
+        // Stepped so a big SVG repaints ~5 times a second instead of every frame.
+        flow: 'flow 1.2s steps(6) infinite',
+        'fg-pulse': 'fg-pulse 1.8s steps(9) infinite',
       },
     },
   },

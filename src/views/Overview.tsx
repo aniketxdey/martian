@@ -33,7 +33,7 @@ function Stats() {
           <span className="text-sm text-fg-muted">/ 100 · {healthLabel(s.healthScore)}</span>
         </span>
         <span className="h-1.5 overflow-hidden rounded-full bg-line-soft" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={s.healthScore} aria-label="Health">
-          <span className={cx('block h-full rounded-full transition-[width] duration-700', s.healthScore >= 80 ? 'bg-ok' : 'bg-warn')} style={{ width: `${s.healthScore}%` }} />
+          <span className={cx('block h-full w-full origin-left rounded-full transition-transform duration-700 ease-out', s.healthScore >= 80 ? 'bg-ok' : 'bg-warn')} style={{ transform: `scaleX(${s.healthScore / 100})` }} />
         </span>
       </Card>
       <Card className="flex flex-col gap-2.5 px-[22px] py-5">
@@ -78,7 +78,7 @@ function FindingRow({ f, onReview }: { f: UiFinding; onReview: (id: string) => v
         {f.state === 'running' && (
           <Link to={f.sessionId ? `/agents/${f.sessionId}` : '/agents'} className="inline-flex min-w-[120px] flex-col items-end gap-1.5 text-13 text-accent-ink no-underline">
             <span className="inline-flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-accent" />Applying</span>
-            <span className="h-1 w-full overflow-hidden rounded-full bg-line-soft"><span className="block h-full rounded-full bg-accent transition-[width] duration-700" style={{ width: `${Math.round((f.progress ?? 0.05) * 100)}%` }} /></span>
+            <span className="h-1 w-full overflow-hidden rounded-full bg-line-soft"><span className="block h-full rounded-full bg-accent w-full origin-left transition-transform duration-700 ease-out" style={{ transform: `scaleX(${parseFloat(`${Math.round((f.progress ?? 0.05) * 100)}%`) / 100})` }} /></span>
           </Link>
         )}
         {f.state === 'done' && (

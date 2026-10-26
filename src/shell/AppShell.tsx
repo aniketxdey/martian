@@ -45,7 +45,7 @@ function RunningAgents({ onOpen }: { onOpen: () => void }) {
               <span className="truncate text-xs font-medium text-white">{i.title}</span>
               <span className="truncate font-mono text-11 text-side-muted">{i.status === 'waiting' ? 'Waiting for your approval' : i.step}</span>
               <span className="h-1 overflow-hidden rounded-full bg-ink-line">
-                <span className="block h-full rounded-full bg-accent-soft transition-[width] duration-700 ease-out" style={{ width: `${Math.max(6, i.pct)}%` }} />
+                <span className="block h-full rounded-full bg-accent-soft w-full origin-left transition-transform duration-700 ease-out" style={{ transform: `scaleX(${parseFloat(`${Math.max(6, i.pct)}%`) / 100})` }} />
               </span>
             </button>
           </li>
@@ -64,8 +64,8 @@ function Sidebar() {
   useEffect(() => { setOpen(false); }, [route.path]);
   // Warm the most likely next pages once the browser is idle.
   useEffect(() => {
-    const idle = (window as any).requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
-    idle(() => { for (const n of NAV) void prefetch(n.key); void prefetch('session'); });
+    const idle = (window as any).requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 600));
+    idle(() => { for (const n of NAV) void prefetch(n.key); void prefetch('session'); }, { timeout: 1200 });
   }, []);
   return (
     <aside className="box-border flex flex-[1_1_240px] flex-col gap-7 bg-ink px-3.5 py-5 text-white max-md:gap-4 max-md:py-3 md-side-h md:max-w-[260px]">
@@ -85,7 +85,15 @@ function Sidebar() {
         </button>
       </div>
       <div className={cx('flex min-h-0 flex-1 flex-col gap-7', !open && 'max-md:hidden')}>
-        <nav aria-label="Main" className="flex flex-col gap-0.5">
+        <nav aria-label="Main" className="relative flex flex-col gap-0.5">
+          {/* One pill that glides to the active item (40px rows, 2px gap). */}
+          {NAV.some((n) => n.key === active) && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-10 rounded-lg bg-ink-3 transition-transform duration-300 ease-[cubic-bezier(.16,1,.3,1)]"
+              style={{ transform: `translateY(${NAV.findIndex((n) => n.key === active) * 42}px)` }}
+            />
+          )}
           {NAV.map(({ key, to, label, Icon }) => {
             const on = key === active;
             return (
@@ -95,7 +103,6 @@ function Sidebar() {
                 aria-current={on ? 'page' : undefined}
                 className={cx('ix-side relative flex h-10 items-center gap-3 rounded-lg px-3 text-left text-sm font-medium no-underline transition-colors', on ? 'text-white' : 'text-side-muted hover:text-white')}
               >
-                {on && <span className="absolute inset-0 rounded-lg bg-ink-3 [view-transition-name:nav-pill]" aria-hidden="true" />}
                 <span className="relative flex items-center gap-3"><Icon className={on ? 'text-accent-soft' : undefined} />{label}</span>
               </Link>
             );

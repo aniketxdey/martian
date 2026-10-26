@@ -51,7 +51,7 @@ export function infraModel(g: InfraGraph, f: InfraFilter): { nodes: GNode[]; edg
     return {
       id: n.id, kind: 'service', label: n.label, sub: n.count != null ? `${n.count.toLocaleString('en-US')} ${n.unit ?? ''}`.trim() : undefined,
       r: 15 + Math.min(9, Math.log10((n.monthlyCost ?? 100) + 1) * 1.6), ring: 410, group: n.parent, parent: n.parent,
-      tone: STATUS_TONE[n.status ?? 'healthy'], util: n.cpu ?? null, badge: n.findings, pulse: n.status === 'hot',
+      tone: STATUS_TONE[n.status ?? 'healthy'], util: n.cpu ?? null, badge: n.findings,
       glyph: (n.type ?? 'sv').replace(/[^a-z]/g, '').slice(0, 2).toUpperCase(),
     };
   });

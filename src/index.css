@@ -240,3 +240,5 @@ html[data-vt="theme"]::view-transition-new(root) { animation: 320ms ease both vt
 html[data-vt="theme"] .vt-page { view-transition-name: none; }
 @keyframes vt-theme-out { to { opacity: 0; } }
 @keyframes vt-theme-in { from { opacity: 0; } }
+/* Each page fades up as it mounts (src/App.tsx keys the wrapper by route). */
+.vt-enter { animation: 280ms cubic-bezier(.16, 1, .3, 1) both vt-in; }

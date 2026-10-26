@@ -56,7 +56,10 @@ const RouterContext = createContext<Ctx>({ route: parse(''), navigate: () => und
 
 export function runTransition(kind: Transition, swap: () => void) {
   const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
-  if (kind === 'none' || prefersReduced()) { swap(); return; }
+  // Page-to-page moves skip the snapshot: the new page mounts and fades up in CSS
+  // (.vt-enter), which costs nothing extra. View Transitions are kept for the big
+  // moments: the orange wash and the theme cross-fade.
+  if (kind === 'none' || kind === 'page' || prefersReduced()) { swap(); return; }
   const root = document.documentElement;
   if (!doc.startViewTransition) {
     if (kind === 'theme') {

@@ -52,6 +52,7 @@ export class DemoStore implements AppStore {
     this.w = createWorld(seed, variantIndex, now);
     seedHistory(this.w, rng(seed).fork('history'));
     this.customs = [];
+    this.shared?.clear();
     this.dirty = true;
     this.state = this.derive();
   }
@@ -105,15 +106,38 @@ export class DemoStore implements AppStore {
         healthScore: healthScore(w), totalResources: resourceCount(w), totalAccounts: accountsCount(w), monthlyCost: cost,
         wasteIdentified: waste, realizedSavings: w.realized, lastScanAt: new Date(w.lastScanAt).toISOString(),
       },
-      findings: w.findings.filter((f) => f.state !== 'dismissed').map((f) => ({ ...f })),
-      activity: w.activity.slice(0, 40).map((a) => ({ ...a, when: minutesAgo(w.now, a.at), fresh: !!a.at && w.now - a.at < 20_000 })),
+      findings: this.share('findings', w.findings.filter((f) => f.state !== 'dismissed'), (f) => `${f.id}|${f.state}|${f.progress ?? ''}|${f.impact}|${f.realized ?? ''}|${f.isNew ? 1 : 0}|${f.sessionId ?? ''}`, (f) => ({ ...f })),
+      activity: this.share('activity', w.activity.slice(0, 40).map((a) => ({ ...a, when: minutesAgo(w.now, a.at), fresh: !!a.at && w.now - a.at < 20_000 })), (a) => `${a.id}|${a.when}|${a.fresh ? 1 : 0}`, (a) => a),
       scan: { running: !!w.scanning, lastScanAt: w.lastScanAt, sessionId: w.scanning ?? undefined },
       topology: this.topology(),
       graph: w.graph,
-      sessions: w.sessions.map(cloneSession),
-      integrations: this.integrationViews(),
+      sessions: this.share('sessions', w.sessions, sessionSig, cloneSession),
+      integrations: this.share('integrations', this.integrationViews(), (v) => JSON.stringify([v.id, v.status, v.enabled, v.mode, v.scope, v.tools.map((t) => t.on), v.lastSync, v.callCount]), (v) => v),
       servers: w.servers.map(({ files, ...s }) => ({ ...s })),
     };
+  }
+
+  /**
+   * Structural sharing between ticks: an item whose signature didn't change keeps its
+   * previous object, and an unchanged list keeps its previous array, so views that
+   * select it don't re-render every second.
+   */
+  private shared = new Map<string, { list: unknown[]; items: Map<string, { sig: string; view: unknown }> }>();
+  private share<T, V>(key: string, src: T[], sig: (x: T) => string, view: (x: T) => V): V[] {
+    const prev = this.shared.get(key) ?? { list: [], items: new Map() };
+    const next = new Map<string, { sig: string; view: unknown }>();
+    const out = src.map((x, i) => {
+      const s = sig(x);
+      const id = s.split('|', 1)[0] || String(i);
+      const hit = prev.items.get(id);
+      const v = hit && hit.sig === s ? (hit.view as V) : view(x);
+      next.set(id, { sig: s, view: v });
+      return v;
+    });
+    const same = out.length === prev.list.length && out.every((x, i) => x === prev.list[i]);
+    const list = same ? (prev.list as V[]) : out;
+    this.shared.set(key, { list, items: next });
+    return list;
   }
 
   private topology(): Topology {
@@ -391,6 +415,9 @@ export class DemoStore implements AppStore {
     };
   }
 }
+
+const sessionSig = (s: AgentSession) =>
+  `${s.id}|${s.status}|${s.endedAt ?? ''}|${s.title}|${s.summary ?? ''}|${s.savings ?? ''}|${s.integrations.join(',')}|${s.agents.map((a) => `${a.status}:${a.steps.map((x) => `${x.status[0]}${x.durationMs}${x.result ? 'r' : ''}${x.text.length}`).join('.')}`).join('/')}`;
 
 const cloneSession = (s: AgentSession): AgentSession => ({
   ...s,
