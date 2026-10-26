@@ -3,12 +3,13 @@
  * their dependencies, environment filters and search, and a telemetry drawer for any
  * node. The environment cards below list every system in plain rows.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useRouter } from '../app/router';
 import { useActions, useApp } from '../app/store';
 import { chatPrefill } from '../app/useChat';
 import { IntegrationLogo, Sparkline, usd } from '../components/bits';
 import { ForceGraph } from '../components/graph/ForceGraph';
+import { useZoom, ZoomOverlay } from '../components/Zoom';
 import { infraMatches, infraModel } from '../components/graph/models';
 import { CATALOG_BY_ID } from '../data/catalog';
 import { Page, PageHeader, PageHeading } from '../shell/AppShell';
@@ -39,15 +40,51 @@ function descendants(g: InfraGraph, id: string): InfraNode[] {
   return out;
 }
 
-function Metric({ label, value, data, max, tone }: { label: string; value: string; data: number[]; max?: number; tone?: string }) {
+function BigChart({ label, data, max, tone, unit }: { label: string; data: number[]; max?: number; tone?: string; unit: (v: number) => string }) {
+  const w = typeof window !== 'undefined' ? Math.max(320, Math.min(1400, window.innerWidth - 140)) : 900;
+  const h = typeof window !== 'undefined' ? Math.max(220, Math.min(460, window.innerHeight - 300)) : 360;
+  const avg = data.reduce((a, b) => a + b, 0) / Math.max(1, data.length);
   return (
-    <div className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface px-3.5 py-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs text-fg-muted">{label}</span>
-        <span className="font-mono text-sm font-medium tabular-nums text-fg">{value}</span>
+    <div className="flex h-full flex-col gap-6 overflow-auto p-8">
+      <dl className="m-0 flex flex-wrap gap-x-10 gap-y-3">
+        {[['Now', data[data.length - 1] ?? 0], ['Average', avg], ['Peak', Math.max(...data)], ['Low', Math.min(...data)]].map(([k, v]) => (
+          <div key={k as string} className="flex flex-col gap-0.5"><dt className="text-xs text-fg-muted">{k}</dt><dd className="m-0 font-mono text-2xl tabular-nums">{unit(v as number)}</dd></div>
+        ))}
+      </dl>
+      <div className="flex flex-col gap-2">
+        <Sparkline data={data} width={w} height={h} max={max} className={cx('w-full', tone)} label={`${label}, last 24 hours`} />
+        <div className="flex justify-between font-mono text-11 text-fg-faint" style={{ width: w }}><span>24 h ago</span><span>12 h ago</span><span>now</span></div>
       </div>
-      <Sparkline data={data} width={210} height={34} max={max} className={cx('w-full', tone)} label={`${label}, last 24 hours`} />
+      <p className="m-0 text-13 text-fg-muted">Half-hour points. The last one updates live while this is open.</p>
     </div>
+  );
+}
+
+function Metric({ label, value, data, max, tone, unit }: { label: string; value: string; data: number[]; max?: number; tone?: string; unit: (v: number) => string }) {
+  const zoom = useZoom();
+  const box = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div
+        ref={box}
+        role="button"
+        tabIndex={0}
+        data-cursor="Zoom"
+        aria-label={`${label}: ${value}. Open full screen`}
+        onClick={() => zoom.open(box.current)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zoom.open(box.current); } }}
+        className="ix-card flex cursor-zoom-in flex-col gap-2 rounded-[10px] border border-line bg-surface px-3.5 py-3 outline-none focus-visible:border-accent"
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-xs text-fg-muted">{label}</span>
+          <span className="font-mono text-sm font-medium tabular-nums text-fg">{value}</span>
+        </div>
+        <Sparkline data={data} width={210} height={34} max={max} className={cx('w-full', tone)} label={`${label}, last 24 hours`} />
+      </div>
+      <ZoomOverlay state={zoom.state} onClose={zoom.close} label={`${label}, last 24 hours`}>
+        <BigChart label={label} data={data} max={max} tone={tone} unit={unit} />
+      </ZoomOverlay>
+    </>
   );
 }
 
@@ -118,11 +155,11 @@ function NodeDrawer({ id, onClose, onSelect }: { id: string | null; onClose: () 
           <h3 className="m-0 text-sm font-semibold">Last 24 hours <span className="font-normal text-fg-muted">· live</span></h3>
           {t ? (
             <div className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1">
-              {t.cpu.some((x) => x > 0) && <Metric label="CPU" value={`${Math.round(last(t.cpu) ?? 0)}%`} data={t.cpu} max={100} />}
-              {t.mem.some((x) => x > 0) && <Metric label="Memory" value={`${Math.round(last(t.mem) ?? 0)}%`} data={t.mem} max={100} tone="text-info" />}
-              <Metric label="Cost per hour" value={`$${(last(t.cost) ?? 0).toFixed(2)}`} data={t.cost} tone="text-ok" />
-              {t.rps && t.rps.some((x) => x > 0) && <Metric label="Requests per second" value={Math.round(last(t.rps) ?? 0).toLocaleString('en-US')} data={t.rps} tone="text-fg-2" />}
-              {t.latency && t.latency.some((x) => x > 0) && <Metric label="p95 latency" value={`${Math.round(last(t.latency) ?? 0)} ms`} data={t.latency} tone="text-warn" />}
+              {t.cpu.some((x) => x > 0) && <Metric label="CPU" value={`${Math.round(last(t.cpu) ?? 0)}%`} data={t.cpu} max={100} unit={(v) => `${Math.round(v)}%`} />}
+              {t.mem.some((x) => x > 0) && <Metric label="Memory" value={`${Math.round(last(t.mem) ?? 0)}%`} data={t.mem} max={100} tone="text-info" unit={(v) => `${Math.round(v)}%`} />}
+              <Metric label="Cost per hour" value={`$${(last(t.cost) ?? 0).toFixed(2)}`} data={t.cost} tone="text-ok" unit={(v) => `$${v.toFixed(2)}`} />
+              {t.rps && t.rps.some((x) => x > 0) && <Metric label="Requests per second" value={Math.round(last(t.rps) ?? 0).toLocaleString('en-US')} data={t.rps} tone="text-fg-2" unit={(v) => Math.round(v).toLocaleString('en-US')} />}
+              {t.latency && t.latency.some((x) => x > 0) && <Metric label="p95 latency" value={`${Math.round(last(t.latency) ?? 0)} ms`} data={t.latency} tone="text-warn" unit={(v) => `${Math.round(v)} ms`} />}
             </div>
           ) : (
             <p className="m-0 rounded-[10px] bg-canvas px-3.5 py-3 text-13 text-fg-muted">
@@ -225,6 +262,8 @@ export const Infrastructure = ({ nodeId }: { nodeId?: string | null }) => {
   const model = useMemo(() => infraModel(graph, { env, q }), [graph, env, q]);
   const hits = useMemo(() => infraMatches(graph, q), [graph, q]);
   const groups = topology.groups.filter((g) => env === 'all' || g.key === env);
+  const zoom = useZoom();
+  const graphBox = useRef<HTMLDivElement>(null);
   const counts = useMemo(() => {
     const c: Record<NodeStatus, number> = { healthy: 0, idle: 0, hot: 0, degraded: 0 };
     for (const n of graph.nodes) if (n.kind === 'service' && n.status) c[n.status] += 1;
@@ -256,17 +295,34 @@ export const Infrastructure = ({ nodeId }: { nodeId?: string | null }) => {
               {hits && <span className="flex-none font-mono text-xs text-fg-faint">{[...hits].filter((h) => graph.nodes.find((n) => n.id === h)?.kind === 'service').length} found</span>}
             </label>
           </div>
-          <ForceGraph
-            nodes={model.nodes}
-            edges={model.edges}
-            layoutKey={model.layoutKey}
-            selected={selected}
-            onSelect={select}
-            highlight={hits}
-            height="min(720px, 78vh)"
-            ariaLabel="Map of integrations, clusters and services"
-            layout={{ mode: 'radial', gap: 14, step: 116, stretch: 1.35, hideMinorBelow: 0.62 }}
-          />
+          <div ref={graphBox}>
+            <ForceGraph
+              nodes={model.nodes}
+              edges={model.edges}
+              layoutKey={model.layoutKey}
+              selected={selected}
+              onSelect={select}
+              highlight={hits}
+              height="min(720px, 78vh)"
+              ariaLabel="Map of integrations, clusters and services"
+              layout={{ mode: 'radial', gap: 14, step: 116, stretch: 1.35, hideMinorBelow: 0.62 }}
+              onExpand={() => zoom.open(graphBox.current)}
+            />
+          </div>
+          <ZoomOverlay state={zoom.state} onClose={zoom.close} label="Infrastructure map">
+            <ForceGraph
+              nodes={model.nodes}
+              edges={model.edges}
+              layoutKey={`${model.layoutKey}:full`}
+              selected={selected}
+              onSelect={(id) => { zoom.close(); select(id); }}
+              highlight={hits}
+              height="100%"
+              className="rounded-none border-0"
+              ariaLabel="Map of integrations, clusters and services, full screen"
+              layout={{ mode: 'radial', gap: 14, step: 116, stretch: 1.6, hideMinorBelow: 0.5 }}
+            />
+          </ZoomOverlay>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-fg-muted">
             {(Object.keys(STATUS) as NodeStatus[]).map((k) => (
               <span key={k} className="inline-flex items-center gap-1.5"><span className={cx('h-2 w-2 rounded-full', STATUS[k].dot)} />{STATUS[k].label} <span className="font-mono text-fg-faint">{counts[k]}</span></span>
@@ -279,7 +335,7 @@ export const Infrastructure = ({ nodeId }: { nodeId?: string | null }) => {
 
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(380px,100%),1fr))] gap-4">
           {groups.map((g) => (
-            <section key={g.key} aria-label={g.name} className="flex flex-col rounded-xl border border-line bg-surface">
+            <section key={g.key} aria-label={g.name} className="ix-card flex flex-col rounded-xl border border-line bg-surface">
               <header className="flex items-start justify-between gap-3 border-b border-line-soft px-5 py-4">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <h3 className="m-0 text-15 font-semibold">{g.name}</h3>

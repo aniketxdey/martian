@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { EMBED } from '../app/env';
+import { Cursor } from '../components/Cursor';
 import { Link, prefetch, RouteKey, useRouter } from '../app/router';
 import { useActions, useApp } from '../app/store';
 import { IconAgents, IconChat, IconClose, IconMenu, IconOverview, IconPlug, IconServer, IconSignOut, IconSliders, MartianMark } from '../ui/icons';
@@ -78,7 +79,7 @@ function Sidebar() {
           aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="hidden h-11 w-11 items-center justify-center rounded-lg border-0 bg-transparent text-side-muted max-md:flex"
+          className="ix-btn hidden h-11 w-11 items-center justify-center rounded-lg border-0 bg-transparent text-side-muted max-md:flex"
         >
           {open ? <IconClose /> : <IconMenu />}
         </button>
@@ -92,7 +93,7 @@ function Sidebar() {
                 key={key}
                 to={to}
                 aria-current={on ? 'page' : undefined}
-                className={cx('relative flex h-10 items-center gap-3 rounded-lg px-3 text-left text-sm font-medium no-underline transition-colors', on ? 'text-white' : 'text-side-muted hover:text-white')}
+                className={cx('ix-side relative flex h-10 items-center gap-3 rounded-lg px-3 text-left text-sm font-medium no-underline transition-colors', on ? 'text-white' : 'text-side-muted hover:text-white')}
               >
                 {on && <span className="absolute inset-0 rounded-lg bg-ink-3 [view-transition-name:nav-pill]" aria-hidden="true" />}
                 <span className="relative flex items-center gap-3"><Icon className={on ? 'text-accent-soft' : undefined} />{label}</span>
@@ -126,7 +127,7 @@ export const formatK = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFi
 export function WastePill() {
   const waste = useApp((s) => Math.round((s.summary?.wasteIdentified ?? 0) / 100) * 100);
   return (
-    <Link to="/overview" className="flex h-[30px] items-center gap-1.5 rounded-full bg-accent-wash px-3 text-13 text-accent-ink no-underline">
+    <Link to="/overview" className="ix-btn flex h-[30px] items-center gap-1.5 rounded-full border border-transparent bg-accent-wash px-3 text-13 text-accent-ink no-underline">
       Open waste <span className="font-mono font-medium tabular-nums">{formatK(waste)}</span>
     </Link>
   );
@@ -134,7 +135,7 @@ export function WastePill() {
 
 export function AskButton() {
   return (
-    <Link to="/chat" className="flex h-[38px] items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 no-underline hover:border-fg-faint">
+    <Link to="/chat" className="ix-btn flex h-[38px] items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 no-underline hover:border-fg-faint">
       Quick Chat<span className="rounded border border-line px-[5px] py-px font-mono text-11 text-fg-muted">⌘K</span>
     </Link>
   );
@@ -147,7 +148,7 @@ function ErrorBar() {
   return (
     <div role="alert" className="flex items-center justify-between gap-3 border-b border-danger-soft bg-danger-wash px-8 py-2.5 text-sm text-danger">
       <span>{error}</span>
-      <button type="button" onClick={() => setError('')} className="h-8 rounded-md border-0 bg-transparent px-2 text-13 font-medium text-danger">Dismiss</button>
+      <button type="button" onClick={() => setError('')} className="ix-btn h-8 rounded-md border-0 bg-transparent px-2 text-13 font-medium text-danger">Dismiss</button>
     </div>
   );
 }
@@ -180,6 +181,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen w-full flex-col" style={{ '--ribbon-h': EMBED ? '28px' : '0px' } as React.CSSProperties}>
       <DemoRibbon />
+      <Cursor />
       <div className="flex min-h-0 w-full flex-1 flex-wrap bg-canvas md:flex-nowrap">
         <Sidebar />
         <div className="flex min-w-0 flex-[999_1_560px] flex-col">

@@ -22,7 +22,7 @@ export const Login = () => {
 
   return (
     <div className="flex min-h-screen w-full flex-wrap bg-surface">
-      <section className="flex min-h-[420px] flex-[1_1_520px] flex-col justify-between gap-10 bg-ink px-14 py-12 text-white max-sm:px-6">
+      <section className="ambient-glow flex min-h-[420px] flex-[1_1_520px] flex-col justify-between gap-10 bg-ink px-14 py-12 text-white max-sm:px-6">
         <div className="flex items-center gap-2.5 text-xl font-semibold">
           <MartianMark box={30} img={56} offset={-13} />
           Martian
@@ -63,7 +63,7 @@ export const Login = () => {
             <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={`${fieldInput} h-11`} />
           </label>
           {auth.error && <p role="alert" className="m-0 rounded-lg bg-danger-wash px-3 py-2.5 text-13 text-danger">{auth.error}</p>}
-          <button type="submit" disabled={auth.loading} className="h-11 rounded-lg border-0 bg-accent text-15 font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-60">
+          <button type="submit" disabled={auth.loading} className="ix-btn-primary h-11 rounded-lg border-0 bg-accent text-15 font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-60">
             {auth.loading ? 'Signing in…' : 'Sign in'}
           </button>
           {LIVE && (

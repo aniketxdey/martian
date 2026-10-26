@@ -31,7 +31,7 @@ function RadioCard({ active, onClick, title, help }: { active: boolean; onClick:
       role="radio"
       aria-checked={active}
       onClick={onClick}
-      className={cx('flex items-start gap-3 rounded-[10px] px-3.5 py-3 text-left', active ? 'border-[1.5px] border-accent bg-accent-wash' : 'border border-line bg-surface')}
+      className={cx('ix-card flex items-start gap-3 rounded-[10px] px-3.5 py-3 text-left', active ? 'border-[1.5px] border-accent bg-accent-wash' : 'border border-line bg-surface')}
     >
       <span className={cx('mt-0.5 box-border h-4 w-4 flex-none rounded-full bg-surface', active ? 'border-[5px] border-accent' : 'border-[1.5px] border-side-muted')} />
       <span className="flex flex-col gap-0.5">
@@ -129,7 +129,7 @@ function ConfigureDrawer({ cur, onClose }: { cur: IntegrationView | null; onClos
           )}
           {cur.catalogId === 'ssh' && (
             <p className="m-0 rounded-[10px] bg-canvas px-3.5 py-3 text-13 leading-normal text-fg-body">
-              {reachable} of {servers.length} servers reachable. Add or edit servers in <Link to="/settings/servers" className="font-medium text-accent-link">Settings</Link>.
+              {reachable} of {servers.length} servers reachable. Add or edit servers in <Link to="/settings/servers" className="ix-underline ix-link font-medium text-accent-link">Settings</Link>.
             </p>
           )}
           {(cur.fields ?? []).length > 0 ? (
@@ -351,7 +351,7 @@ export const Integrations = ({ openId }: { openId?: string | null }) => {
             const tools = c.tools.filter((t) => t.on).length;
             const writes = c.tools.filter((t) => t.write).length;
             return (
-              <article key={c.id} className={cx('flex flex-col gap-3.5 rounded-xl border border-line bg-surface p-5 transition-colors', live && 'hover:border-line-strong', soon && 'opacity-75')}>
+              <article key={c.id} className={cx('ix-card flex flex-col gap-3.5 rounded-xl border border-line bg-surface p-5 transition-colors', live && 'hover:border-line-strong', soon && 'opacity-75')}>
                 <div className="flex items-start gap-3">
                   <Logo c={c} size={44} />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -44,7 +44,7 @@ function MessageView({ msg, onQuickAction, compact }: { msg: ChatMessage; onQuic
         {prefs.showSuggestions && msg.quickActions && msg.quickActions.length > 0 && (
           <div className="flex flex-wrap gap-2 font-sans">
             {msg.quickActions.map((a, j) => (
-              <button key={j} type="button" onClick={() => onQuickAction(a.action)} className="min-h-9 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-fg-2 transition-colors hover:border-accent hover:text-accent-ink">
+              <button key={j} type="button" onClick={() => onQuickAction(a.action)} className="ix-btn min-h-9 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-fg-2 transition-colors hover:border-accent hover:text-accent-ink">
                 {clean(a.text)}
               </button>
             ))}
@@ -71,8 +71,8 @@ export function ApprovalCard({ pending, onDecide, busy, compact }: { pending: Pe
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={() => onDecide(true)} className="h-[38px] rounded-lg border-0 bg-accent px-4 text-13 font-semibold text-white disabled:opacity-60">Approve and run</button>
-        <button type="button" disabled={busy} onClick={() => onDecide(false)} className="h-[38px] rounded-lg border border-line-strong bg-surface px-4 text-13 text-fg-2 disabled:opacity-60">Decline</button>
+        <button type="button" disabled={busy} onClick={() => onDecide(true)} className="ix-btn-primary h-[38px] rounded-lg border-0 bg-accent px-4 text-13 font-semibold text-white disabled:opacity-60">Approve and run</button>
+        <button type="button" disabled={busy} onClick={() => onDecide(false)} className="ix-btn h-[38px] rounded-lg border border-line-strong bg-surface px-4 text-13 text-fg-2 disabled:opacity-60">Decline</button>
       </div>
     </div>
   );
@@ -105,7 +105,7 @@ export function Composer({ chat, placeholder, scope, suggestions, compact, autoF
           {scope ? <span className="rounded-md bg-chip px-2 py-1 font-mono text-xs text-fg-body">{scope}</span> : <span />}
           <div className="flex items-center gap-2.5">
             <span className="font-mono text-xs text-fg-faint">{prefs.enterToSend ? '↵ to send' : '⌘↵ to send'}</span>
-            <button type="submit" aria-label="Send" disabled={chat.isTyping || !chat.inputValue.trim()} className="flex h-10 w-10 items-center justify-center rounded-[10px] border-0 bg-accent text-white transition-[filter,opacity] hover:brightness-110 disabled:opacity-50">
+            <button type="submit" aria-label="Send" disabled={chat.isTyping || !chat.inputValue.trim()} className="ix-btn-primary flex h-10 w-10 items-center justify-center rounded-[10px] border-0 bg-accent text-white transition-[filter,opacity] hover:brightness-110 disabled:opacity-50">
               <IconArrowUp />
             </button>
           </div>
@@ -114,7 +114,7 @@ export function Composer({ chat, placeholder, scope, suggestions, compact, autoF
       {suggestions && suggestions.length > 0 && (
         <div className="flex flex-wrap justify-center gap-2">
           {suggestions.map((s) => (
-            <button key={s} type="button" onClick={() => chat.setInputValue(s)} className="min-h-[34px] rounded-full border border-line bg-canvas px-3 text-13 text-fg-body transition-colors hover:border-fg-faint">
+            <button key={s} type="button" onClick={() => chat.setInputValue(s)} className="ix-btn min-h-[34px] rounded-full border border-line bg-canvas px-3 text-13 text-fg-body transition-colors hover:border-fg-faint">
               {s}
             </button>
           ))}

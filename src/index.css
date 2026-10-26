@@ -137,3 +137,106 @@ html[data-vt-fallback="orange"] body::after {
 /* Graph semantic zoom: far out, service labels hide unless hovered, selected or matched. */
 [data-far] .fg-minor { opacity: 0; transition: opacity 150ms ease; }
 [data-far] .fg-show .fg-minor { opacity: 1; }
+
+/* ---------- Micro-interactions ----------
+ * One motion language for the console and the landing page:
+ * - buttons hover into accent orange (180ms, out-expo, 1px lift); orange buttons lift and cast a soft shadow
+ * - tabs, top-bar actions and inline links grow an orange underline from the center
+ * - sidebar items grow an accent bar from the center; cards and rows lift 2px
+ * Reduce motion (Settings or the OS) flattens all of it via the rules above.
+ */
+:root { --ix-ease: cubic-bezier(.16, 1, .3, 1); --ix-fast: 180ms; }
+
+.ix-btn {
+  transition: background-color var(--ix-fast) var(--ix-ease), color var(--ix-fast) var(--ix-ease),
+    border-color var(--ix-fast) var(--ix-ease), transform var(--ix-fast) var(--ix-ease), box-shadow var(--ix-fast) var(--ix-ease);
+}
+.ix-btn:hover:not(:disabled), .ix-btn:focus-visible:not(:disabled) {
+  background-color: rgb(var(--c-accent)); border-color: rgb(var(--c-accent)); color: #fff; transform: translateY(-1px);
+}
+.ix-btn:hover:not(:disabled) *, .ix-btn:focus-visible:not(:disabled) * { color: inherit; }
+.ix-btn:active:not(:disabled) { transform: translateY(0); transition-duration: 60ms; }
+
+.ix-btn-primary { transition: transform var(--ix-fast) var(--ix-ease), box-shadow var(--ix-fast) var(--ix-ease), filter var(--ix-fast) var(--ix-ease); }
+.ix-btn-primary:hover:not(:disabled), .ix-btn-primary:focus-visible:not(:disabled) {
+  transform: translateY(-1px); box-shadow: 0 8px 18px -8px rgb(var(--c-accent) / .65); filter: brightness(1.04);
+}
+.ix-btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: none; transition-duration: 60ms; }
+.ix-arrow { transition: transform var(--ix-fast) var(--ix-ease); }
+:is(.ix-btn, .ix-btn-primary, .ix-row, .ix-link, a):hover .ix-arrow { transform: translateX(3px); }
+
+/* Underline that grows from the center: tabs, top-bar text actions, inline links. */
+.ix-underline { position: relative; }
+.ix-underline::after {
+  content: ""; position: absolute; left: var(--ix-ul-inset, 0); right: var(--ix-ul-inset, 0); bottom: var(--ix-ul-bottom, -2px);
+  height: 2px; border-radius: 2px; background: rgb(var(--c-accent));
+  transform: scaleX(0); transform-origin: center; transition: transform 220ms var(--ix-ease);
+}
+.ix-underline:hover::after, .ix-underline:focus-visible::after,
+.ix-underline[aria-selected="true"]::after, .ix-underline[aria-current]::after { transform: scaleX(1); }
+.ix-link { text-decoration: none; }
+
+/* Sidebar: accent bar grows vertically from the center on hover; the active pill glides. */
+.ix-side { position: relative; }
+.ix-side::before {
+  content: ""; position: absolute; left: -6px; top: 22%; bottom: 22%; width: 3px; border-radius: 3px;
+  background: rgb(var(--c-accent)); transform: scaleY(0); transform-origin: center; transition: transform 220ms var(--ix-ease);
+}
+.ix-side:hover::before, .ix-side:focus-visible::before { transform: scaleY(1); }
+
+/* Cards and list rows lift 2px and their border warms toward the accent. */
+.ix-card, .ix-row {
+  transition: transform 220ms var(--ix-ease), border-color 220ms var(--ix-ease), box-shadow 220ms var(--ix-ease), background-color 180ms ease;
+}
+.ix-card:hover { transform: translateY(-2px); border-color: rgb(var(--c-accent) / .3); box-shadow: 0 10px 24px -16px rgb(10 10 11 / .25); }
+.ix-row { position: relative; }
+.ix-row:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -14px rgb(10 10 11 / .3); z-index: 1; border-color: rgb(var(--c-accent) / .3); }
+
+/* Ambient glow for the sign-in screen and empty states: slow, faint, accent. */
+.ambient-glow { position: relative; isolation: isolate; overflow: hidden; }
+.ambient-glow::before {
+  content: ""; position: absolute; inset: -30%; z-index: -1; pointer-events: none;
+  background: radial-gradient(40% 40% at 30% 35%, rgb(var(--c-accent) / .16), transparent 70%),
+    radial-gradient(35% 35% at 75% 70%, rgb(var(--c-accent) / .09), transparent 70%);
+  animation: ambient-drift 22s ease-in-out infinite alternate;
+}
+@keyframes ambient-drift { to { transform: translate3d(4%, -3%, 0) scale(1.06); } }
+
+/* Theme switch fallback for browsers without View Transitions. */
+html.theme-fade, html.theme-fade * { transition: background-color 280ms ease, color 280ms ease, border-color 280ms ease !important; }
+
+/* Cursor follower (src/components/Cursor.tsx). */
+.cursor-ring {
+  position: fixed; left: 0; top: 0; z-index: 70; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none;
+  border-radius: 999px; border: 1.5px solid rgb(var(--c-accent) / .85); background: rgb(var(--c-accent) / .1);
+  display: flex; align-items: center; justify-content: center; opacity: 0;
+  transition: opacity 160ms ease, width 200ms var(--ix-ease), height 200ms var(--ix-ease), margin 200ms var(--ix-ease), background-color 200ms ease;
+  will-change: transform;
+}
+.cursor-ring.is-on { opacity: 1; }
+.cursor-ring.has-label { width: 58px; height: 58px; margin: -29px 0 0 -29px; background: rgb(var(--c-accent) / .92); }
+.cursor-ring span { font: 600 10.5px/1 "Geist Sans", system-ui, sans-serif; letter-spacing: .02em; color: #fff; opacity: 0; transition: opacity 120ms ease; }
+.cursor-ring.has-label span { opacity: 1; }
+.cursor-dot { position: fixed; left: 0; top: 0; z-index: 71; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 99px; background: rgb(var(--c-accent)); pointer-events: none; opacity: 0; transition: opacity 120ms ease; }
+.cursor-dot.is-on { opacity: 1; }
+html.cursor-active [data-cursor], html.cursor-active [data-cursor] * { cursor: none !important; }
+@media (pointer: coarse) { .cursor-ring, .cursor-dot { display: none; } }
+
+/* Zoom overlay (src/components/Zoomable.tsx). */
+.zoom-backdrop { position: fixed; inset: 0; z-index: 60; background: rgb(10 10 11 / .55); backdrop-filter: blur(3px); }
+.zoom-panel { position: fixed; inset: 24px; z-index: 61; transform-origin: top left; }
+/* No lifts, drifts or followers when motion is reduced. */
+.reduce-motion :is(.ix-btn, .ix-btn-primary, .ix-card, .ix-row):hover { transform: none !important; }
+.reduce-motion .ambient-glow::before { animation: none; }
+.reduce-motion :is(.cursor-ring, .cursor-dot) { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.ix-btn, .ix-btn-primary, .ix-card, .ix-row):hover { transform: none !important; }
+  .ambient-glow::before { animation: none; }
+  :is(.cursor-ring, .cursor-dot) { display: none; }
+}
+/* Theme change: the page cross-fades instead of flashing. */
+html[data-vt="theme"]::view-transition-old(root) { animation: 320ms ease both vt-theme-out; }
+html[data-vt="theme"]::view-transition-new(root) { animation: 320ms ease both vt-theme-in; }
+html[data-vt="theme"] .vt-page { view-transition-name: none; }
+@keyframes vt-theme-out { to { opacity: 0; } }
+@keyframes vt-theme-in { from { opacity: 0; } }

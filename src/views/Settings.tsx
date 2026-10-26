@@ -58,7 +58,7 @@ function Servers() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex max-w-[680px] flex-col gap-1.5">
           <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">Physical servers</h2>
-          <p className="m-0 text-sm text-fg-muted">On-premises machines Martian reaches over SSH or RDP. Cloud accounts live in <Link to="/integrations" className="font-medium text-accent-link">Integrations</Link>.</p>
+          <p className="m-0 text-sm text-fg-muted">On-premises machines Martian reaches over SSH or RDP. Cloud accounts live in <Link to="/integrations" className="ix-underline ix-link font-medium text-accent-link">Integrations</Link>.</p>
         </div>
         <Button variant="primary" onClick={() => void add()}><IconPlus size={16} />Add server</Button>
       </div>
@@ -95,8 +95,8 @@ function Servers() {
                     {x.status === 'connected'
                       ? <Button size="sm" onClick={() => void browse(x)}>Browse files</Button>
                       : <Button size="sm" disabled={x.status === 'connecting'} onClick={() => void actions.connect(x.id)}>{x.status === 'error' ? 'Retry' : 'Connect'}</Button>}
-                    <button type="button" aria-label={`Edit ${x.name}`} onClick={() => { setIsNew(false); setEditing({ ...x }); }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-fg-body hover:border-fg-faint"><IconPencil size={15} /></button>
-                    <button type="button" aria-label={`Delete ${x.name}`} onClick={() => void actions.remove(x.id)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-danger hover:border-danger-soft"><IconTrash size={15} /></button>
+                    <button type="button" aria-label={`Edit ${x.name}`} onClick={() => { setIsNew(false); setEditing({ ...x }); }} className="ix-btn flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-fg-body hover:border-fg-faint"><IconPencil size={15} /></button>
+                    <button type="button" aria-label={`Delete ${x.name}`} onClick={() => void actions.remove(x.id)} className="ix-btn flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-danger hover:border-danger-soft"><IconTrash size={15} /></button>
                   </div>
                 </td>
               </tr>
@@ -239,7 +239,7 @@ function Choice<K extends string>({ items, value, onChange, label }: { items: { 
           role="radio"
           aria-checked={value === it.key}
           onClick={() => onChange(it.key)}
-          className={cx('min-h-9 rounded-md border-0 px-3 text-13 transition-colors', value === it.key ? 'bg-surface font-medium text-fg shadow-tab' : 'bg-transparent text-fg-body hover:text-fg')}
+          className={cx('ix-card min-h-9 rounded-md border-0 px-3 text-13 transition-colors', value === it.key ? 'bg-surface font-medium text-fg shadow-tab' : 'bg-transparent text-fg-body hover:text-fg')}
         >
           {it.label}
         </button>
@@ -258,7 +258,7 @@ const ThemeCard = ({ k, active, onClick }: { k: Prefs['theme']; active: boolean;
     </span>
   );
   return (
-    <button type="button" role="radio" aria-checked={active} onClick={onClick} className={cx('flex w-[140px] flex-col gap-2 rounded-xl border bg-surface p-2 text-left transition-colors', active ? 'border-accent ring-2 ring-accent/25' : 'border-line hover:border-line-strong')}>
+    <button type="button" role="radio" aria-checked={active} onClick={onClick} className={cx('ix-card flex w-[140px] flex-col gap-2 rounded-xl border bg-surface p-2 text-left transition-colors', active ? 'border-accent ring-2 ring-accent/25' : 'border-line hover:border-line-strong')}>
       <span className="flex h-[68px] overflow-hidden rounded-md border border-line">
         {k === 'system' ? <>{pane(false)}{pane(true)}</> : pane(k === 'dark')}
       </span>
@@ -290,7 +290,7 @@ function Appearance() {
                 aria-label={ACCENTS[a].label}
                 title={ACCENTS[a].label}
                 onClick={() => set('accent', a)}
-                className={cx('flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105', prefs.accent === a ? 'border-fg' : 'border-transparent')}
+                className={cx('ix-card flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105', prefs.accent === a ? 'border-fg' : 'border-transparent')}
               >
                 <span className="h-6 w-6 rounded-full" style={{ background: ACCENTS[a].swatch }} />
               </button>
@@ -324,7 +324,7 @@ function Appearance() {
                 role="radio"
                 aria-checked={prefs.chatFont === f}
                 onClick={() => set('chatFont', f)}
-                className={cx('flex flex-col gap-1 rounded-[10px] border px-3 py-2.5 text-left transition-colors', prefs.chatFont === f ? 'border-accent bg-accent-wash' : 'border-line bg-surface hover:border-line-strong')}
+                className={cx('ix-card flex flex-col gap-1 rounded-[10px] border px-3 py-2.5 text-left transition-colors', prefs.chatFont === f ? 'border-accent bg-accent-wash' : 'border-line bg-surface hover:border-line-strong')}
               >
                 <span className="text-xl text-fg" style={{ fontFamily: CHAT_FONTS[f].stack }}>Aa</span>
                 <span className="text-xs text-fg-body">{CHAT_FONTS[f].label}</span>
@@ -419,7 +419,7 @@ function DemoData() {
               aria-checked={i === current}
               disabled={EMBED}
               onClick={() => regenerate(i)}
-              className={cx('flex flex-col gap-1 rounded-xl border px-4 py-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60', i === current ? 'border-accent bg-accent-wash' : 'border-line bg-surface hover:border-line-strong')}
+              className={cx('ix-card flex flex-col gap-1 rounded-xl border px-4 py-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60', i === current ? 'border-accent bg-accent-wash' : 'border-line bg-surface hover:border-line-strong')}
             >
               <span className="text-sm font-semibold text-fg">{v.org.name}</span>
               <span className="text-13 text-fg-body">{v.org.industry} · {v.org.hq}</span>

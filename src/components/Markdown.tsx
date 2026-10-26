@@ -92,8 +92,8 @@ export function inline(text: string, key = 'i'): React.ReactNode[] {
     else if (m[4]) {
       const mm = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/)!;
       const href = /^(https?:|#|\/)/.test(mm[2]) ? mm[2] : '#';
-      out.push(<a key={k} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="font-medium text-accent-link underline decoration-accent/30 underline-offset-2 hover:decoration-accent">{inline(mm[1], k)}</a>);
-    } else if (m[5]) out.push(<a key={k} href={tok} target="_blank" rel="noreferrer" className="text-accent-link underline underline-offset-2">{tok}</a>);
+      out.push(<a key={k} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="ix-underline ix-link font-medium text-accent-link">{inline(mm[1], k)}</a>);
+    } else if (m[5]) out.push(<a key={k} href={tok} target="_blank" rel="noreferrer" className="ix-underline ix-link text-accent-link">{tok}</a>);
     last = at + tok.length;
   }
   if (last < text.length) out.push(text.slice(last));

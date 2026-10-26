@@ -9,12 +9,13 @@ export { cx };
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
 type BtnSize = 'sm' | 'md' | 'lg';
 
+// Every button hovers into the accent; buttons that are already filled lift instead (index.css).
 const btnVariant: Record<BtnVariant, string> = {
-  primary: 'bg-accent text-white font-semibold border-0',
-  secondary: 'bg-surface text-fg font-medium border border-line-strong',
-  ghost: 'bg-transparent text-fg-body font-medium border-0',
-  danger: 'bg-danger text-white font-semibold border-0',
-  dangerOutline: 'bg-surface text-danger font-medium border border-danger-line',
+  primary: 'ix-btn-primary bg-accent text-white font-semibold border-0',
+  secondary: 'ix-btn bg-surface text-fg font-medium border border-line-strong',
+  ghost: 'ix-btn bg-transparent text-fg-body font-medium border border-transparent',
+  danger: 'ix-btn-primary bg-danger text-white font-semibold border-0',
+  dangerOutline: 'ix-btn bg-surface text-danger font-medium border border-danger-line',
 };
 const btnSize: Record<BtnSize, string> = {
   sm: 'h-9 px-3.5 text-13 rounded-lg',
@@ -39,7 +40,7 @@ export const IconButton = ({ label, className, children, ...rest }: React.Button
     type="button"
     aria-label={label}
     {...rest}
-    className={cx('flex h-9 w-9 items-center justify-center rounded-lg border-0 bg-transparent text-fg-body', className)}
+    className={cx('ix-btn flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-transparent text-fg-body', className)}
   >
     {children}
   </button>
@@ -101,7 +102,8 @@ export function SegTabs<K extends string>({ items, value, onChange, label }: { i
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.key)}
-            className={cx('h-[34px] rounded-[7px] border-0 px-3.5 text-13 font-medium', active ? 'bg-surface text-fg shadow-tab' : 'bg-transparent text-fg-body')}
+            style={{ '--ix-ul-inset': '12px', '--ix-ul-bottom': '4px' } as React.CSSProperties}
+            className={cx('ix-underline h-[34px] rounded-[7px] border-0 px-3.5 text-13 font-medium transition-colors hover:text-fg', active ? 'bg-surface text-fg shadow-tab' : 'bg-transparent text-fg-body')}
           >
             {t.label}
           </button>
@@ -124,7 +126,8 @@ export function LineTabs<K extends string>({ items, value, onChange, label }: { 
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.key)}
-            className={cx('-mb-px h-11 border-0 border-b-2 bg-transparent px-0.5 text-sm', active ? 'border-accent font-semibold text-fg' : 'border-transparent font-medium text-fg-muted')}
+            style={{ '--ix-ul-bottom': '-1px' } as React.CSSProperties}
+            className={cx('ix-underline -mb-px h-11 border-0 bg-transparent px-0.5 text-sm transition-colors hover:text-fg', active ? 'font-semibold text-fg' : 'font-medium text-fg-muted')}
           >
             {t.label}
           </button>
@@ -137,7 +140,7 @@ export function LineTabs<K extends string>({ items, value, onChange, label }: { 
 /* ---------- Cards and stats ---------- */
 
 export const Card = ({ className, children, as: Tag = 'div' }: { className?: string; children: React.ReactNode; as?: any }) => (
-  <Tag className={cx('rounded-xl border border-line bg-surface', className)}>{children}</Tag>
+  <Tag className={cx('ix-card rounded-xl border border-line bg-surface', className)}>{children}</Tag>
 );
 
 export const Stat = ({ label, value, sub, valueClass, children }: { label: string; value: React.ReactNode; sub?: React.ReactNode; valueClass?: string; children?: React.ReactNode }) => (

@@ -39,7 +39,7 @@ function Row({ s, now, onOpen }: { s: AgentSession; now: number; onOpen: () => v
   const tools = s.agents.reduce((n, a) => n + a.steps.filter((x) => x.tool).length, 0);
   return (
     <li>
-      <button type="button" onClick={onOpen} className={cx('group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 border-0 border-b border-line-soft bg-transparent px-5 py-4 text-left transition-colors hover:bg-canvas', s.status === 'running' && 'bg-accent-wash/30')}>
+      <button type="button" data-cursor="Open" onClick={onOpen} className={cx('ix-row group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 border-0 border-b border-line-soft bg-transparent px-5 py-4 text-left transition-colors hover:bg-canvas', s.status === 'running' && 'bg-accent-wash/30')}>
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <StatusPill status={s.status} />
@@ -64,7 +64,7 @@ function Row({ s, now, onOpen }: { s: AgentSession; now: number; onOpen: () => v
         <div className="flex items-center gap-4">
           {s.savings ? <span className={cx('font-mono text-sm tabular-nums', s.source === 'approval' && s.status === 'completed' ? 'text-ok' : 'text-fg-2')}>{usd(s.savings)}/mo</span> : null}
           {s.integrations.length > 0 && <LogoStack ids={s.integrations} />}
-          <IconArrowRight size={16} className="text-fg-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+          <IconArrowRight size={16} className="ix-arrow text-fg-faint group-hover:text-accent" />
         </div>
       </button>
     </li>
@@ -102,7 +102,7 @@ function NewWorkflow({ open, onClose }: { open: boolean; onClose: () => void }) 
           className="box-border w-full resize-y rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm text-fg outline-none focus:border-fg-faint"
         />
         <div className="flex flex-wrap gap-2">
-          {IDEAS.map((i) => <button key={i} type="button" onClick={() => setGoal(i)} className="min-h-[34px] rounded-full border border-line bg-canvas px-3 text-13 text-fg-body hover:border-fg-faint">{i}</button>)}
+          {IDEAS.map((i) => <button key={i} type="button" onClick={() => setGoal(i)} className="ix-btn min-h-[34px] rounded-full border border-line bg-canvas px-3 text-13 text-fg-body hover:border-fg-faint">{i}</button>)}
         </div>
       </div>
     </Dialog>
@@ -172,7 +172,7 @@ export const Agents = () => {
           </label>
         </div>
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
-          {groups.length === 0 && <p className="m-0 px-5 py-12 text-center text-sm text-fg-muted">No runs match. Try another filter, or start a workflow.</p>}
+          {groups.length === 0 && <p className="ambient-glow m-0 px-5 py-12 text-center text-sm text-fg-muted">No runs match. Try another filter, or start a workflow.</p>}
           {groups.map(([label, list]) => (
             <section key={label} aria-label={label}>
               <h3 className="m-0 border-b border-line-soft bg-canvas px-5 py-2 font-mono text-11 font-medium uppercase tracking-[0.06em] text-fg-faint">{label} · {list.length}</h3>

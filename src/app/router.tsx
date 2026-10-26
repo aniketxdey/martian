@@ -59,6 +59,12 @@ export function runTransition(kind: Transition, swap: () => void) {
   if (kind === 'none' || prefersReduced()) { swap(); return; }
   const root = document.documentElement;
   if (!doc.startViewTransition) {
+    if (kind === 'theme') {
+      root.classList.add('theme-fade');
+      swap();
+      window.setTimeout(() => root.classList.remove('theme-fade'), 320);
+      return;
+    }
     root.dataset.vtFallback = kind;
     swap();
     window.setTimeout(() => delete root.dataset.vtFallback, 450);

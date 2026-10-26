@@ -12,6 +12,7 @@ import { ChatMessage, useChat } from '../app/useChat';
 import { duration, IntegrationLogo, LogoStack, StatusPill, usd } from '../components/bits';
 import { Composer, Conversation } from '../components/chat/ChatPanel';
 import { ForceGraph } from '../components/graph/ForceGraph';
+import { useZoom, ZoomOverlay } from '../components/Zoom';
 import { sessionModel } from '../components/graph/models';
 import { CATALOG_BY_ID } from '../data/catalog';
 import { PageHeader } from '../shell/AppShell';
@@ -180,6 +181,8 @@ function RunPane({ s }: { s: Session }) {
   const calls = steps.filter((x) => x.tool).length;
   const end = s.endedAt ?? now;
   const traceRef = useRef<HTMLDivElement>(null);
+  const zoom = useZoom();
+  const mapBox = useRef<HTMLDivElement>(null);
   const onSelect = (id: string | null) => {
     setSel(id);
     if (id && id !== 'session') {
@@ -218,16 +221,32 @@ function RunPane({ s }: { s: Session }) {
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 border-t-2 border-dashed border-accent" />running now</span>
           </span>
         </div>
-        <ForceGraph
-          nodes={model.nodes}
-          edges={model.edges}
-          layoutKey={model.layoutKey}
-          selected={sel}
-          onSelect={onSelect}
-          height={500}
-          ariaLabel={`Map of agent run ${s.title}`}
-          layout={{ mode: 'radial', gap: 22, step: 92, minRadius: 84 }}
-        />
+        <div ref={mapBox}>
+          <ForceGraph
+            nodes={model.nodes}
+            edges={model.edges}
+            layoutKey={model.layoutKey}
+            selected={sel}
+            onSelect={onSelect}
+            height={500}
+            ariaLabel={`Map of agent run ${s.title}`}
+            layout={{ mode: 'radial', gap: 22, step: 92, minRadius: 84 }}
+            onExpand={() => zoom.open(mapBox.current)}
+          />
+        </div>
+        <ZoomOverlay state={zoom.state} onClose={zoom.close} label={`Map of ${s.title}`}>
+          <ForceGraph
+            nodes={model.nodes}
+            edges={model.edges}
+            layoutKey={`${model.layoutKey}:full`}
+            selected={sel}
+            onSelect={(id) => { zoom.close(); onSelect(id); }}
+            height="100%"
+            className="rounded-none border-0"
+            ariaLabel={`Map of agent run ${s.title}, full screen`}
+            layout={{ mode: 'radial', gap: 26, step: 120, minRadius: 100, stretch: 1.4 }}
+          />
+        </ZoomOverlay>
       </div>
 
       <div ref={traceRef} className="flex scroll-mt-20 flex-col gap-3">
@@ -237,10 +256,10 @@ function RunPane({ s }: { s: Session }) {
             {selLabel && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-accent bg-accent-wash py-1 pl-2.5 pr-1 text-xs text-accent-ink">
                 <IconFilter size={12} />{selLabel}
-                <button type="button" aria-label="Clear filter" onClick={() => setSel(null)} className="flex h-5 w-5 items-center justify-center rounded-full border-0 bg-transparent text-accent-ink hover:bg-accent/15"><IconClose size={12} /></button>
+                <button type="button" aria-label="Clear filter" onClick={() => setSel(null)} className="ix-btn flex h-5 w-5 items-center justify-center rounded-full border-0 bg-transparent text-accent-ink hover:bg-accent/15"><IconClose size={12} /></button>
               </span>
             )}
-            <button type="button" onClick={() => setClosed(closed.size ? new Set() : new Set(s.agents.map((a) => a.id)))} className="h-8 rounded-md border border-line bg-surface px-2.5 text-xs text-fg-body hover:border-fg-faint">
+            <button type="button" onClick={() => setClosed(closed.size ? new Set() : new Set(s.agents.map((a) => a.id)))} className="ix-btn h-8 rounded-md border border-line bg-surface px-2.5 text-xs text-fg-body hover:border-fg-faint">
               {closed.size ? 'Expand all' : 'Collapse all'}
             </button>
           </div>
@@ -284,8 +303,8 @@ function ChatPane({ s, onClose }: { s: Session; onClose?: () => void }) {
       <div className="flex h-12 flex-none items-center justify-between gap-2 border-b border-line px-5">
         <span className="flex items-center gap-2 text-sm font-semibold"><IconChat size={16} className="text-accent" />Ask about this run</span>
         <span className="flex items-center gap-1">
-          <button type="button" onClick={chat.reset} className="h-8 rounded-md border-0 bg-transparent px-2 text-xs text-fg-muted hover:bg-chip hover:text-fg">Clear</button>
-          {onClose && <button type="button" aria-label="Hide chat" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-muted hover:bg-chip"><IconClose size={15} /></button>}
+          <button type="button" onClick={chat.reset} className="ix-btn h-8 rounded-md border-0 bg-transparent px-2 text-xs text-fg-muted hover:bg-chip hover:text-fg">Clear</button>
+          {onClose && <button type="button" aria-label="Hide chat" onClick={onClose} className="ix-btn flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-muted hover:bg-chip"><IconClose size={15} /></button>}
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
@@ -352,7 +371,7 @@ export const AgentSession = ({ id }: { id: string }) => {
     return (
       <>
         <PageHeader title="Agent run" meta={<Link to="/agents" className="text-13 text-fg-muted no-underline hover:text-fg">All runs</Link>} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-16 text-center">
+        <div className="ambient-glow flex flex-1 flex-col items-center justify-center gap-3 p-16 text-center">
           {loading ? <p className="m-0 text-sm text-fg-muted">Loading the run…</p> : (
             <>
               <h2 className="m-0 text-lg font-semibold">This run isn't here</h2>
@@ -380,9 +399,9 @@ export const AgentSession = ({ id }: { id: string }) => {
           <span className="font-mono text-xs text-fg-muted max-md:hidden">{SOURCE[s.source]} · {new Date(s.startedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}{s.requestedBy ? ` · ${s.requestedBy}` : ''}</span>
         </>}
         actions={<>
-          <Link to="/agents" className="flex h-[38px] items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 no-underline hover:border-fg-faint"><IconArrowLeft size={14} />All runs</Link>
-          {s.source !== 'approval' && <button type="button" onClick={() => void again()} className="flex h-[38px] items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 hover:border-fg-faint"><IconPlay size={13} />Run again</button>}
-          {wide && !chatOpen && <button type="button" onClick={() => setChatOpen(true)} className="flex h-[38px] items-center gap-1.5 rounded-lg border-0 bg-accent px-3 text-13 font-medium text-white"><IconChat size={15} />Ask about this run</button>}
+          <Link to="/agents" className="ix-btn flex h-[38px] items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 no-underline hover:border-fg-faint"><IconArrowLeft size={14} />All runs</Link>
+          {s.source !== 'approval' && <button type="button" onClick={() => void again()} className="ix-btn flex h-[38px] items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 hover:border-fg-faint"><IconPlay size={13} />Run again</button>}
+          {wide && !chatOpen && <button type="button" onClick={() => setChatOpen(true)} className="ix-btn-primary flex h-[38px] items-center gap-1.5 rounded-lg border-0 bg-accent px-3 text-13 font-medium text-white"><IconChat size={15} />Ask about this run</button>}
         </>}
       />
       {!wide && (

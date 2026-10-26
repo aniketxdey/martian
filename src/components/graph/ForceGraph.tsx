@@ -9,6 +9,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asset } from '../../app/env';
 import { CATALOG_BY_ID } from '../../data/catalog';
+import { IconExpand } from '../../ui/icons';
 import { cx } from '../../ui/kit';
 import { bounds, forceLayout, ForceLink, ForceNode, levelsOf, Positioned, radialTree } from './force';
 
@@ -63,6 +64,7 @@ const NodeShape = memo(function NodeShape({ n, selected, dim, hot, show, outward
     <g
       role="button"
       tabIndex={0}
+      data-cursor-label="Open"
       aria-label={`${n.label}${n.sub ? `, ${n.sub}` : ''}`}
       className={cx('cursor-pointer outline-none transition-opacity duration-200', dim && 'opacity-25', show && 'fg-show')}
       onMouseEnter={() => onEnter(n.id)}
@@ -143,10 +145,12 @@ const NodeShape = memo(function NodeShape({ n, selected, dim, hot, show, outward
 });
 
 export function ForceGraph({
-  nodes, edges, layoutKey, selected, onSelect, highlight, height = 520, ariaLabel, layout, className, toolbar,
+  nodes, edges, layoutKey, selected, onSelect, highlight, height = 520, ariaLabel, layout, className, toolbar, onExpand,
 }: {
   nodes: GNode[]; edges: GEdge[]; layoutKey: string; selected?: string | null; onSelect?: (id: string | null) => void;
   highlight?: Set<string> | null; height?: number | string; ariaLabel: string; className?: string; toolbar?: React.ReactNode;
+  /** Shows an Expand button that opens the graph full screen. */
+  onExpand?: () => void;
   layout?: { mode?: 'force' | 'radial'; stretch?: number; hideMinorBelow?: number; minRadius?: number; ringStrength?: number; charge?: number; groupStrength?: number; iterations?: number; gap?: number; step?: number; lengths?: Partial<Record<GEdge['kind'], number>> };
 }) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -265,7 +269,7 @@ export function ForceGraph({
   const onClick = useCallback((id: string) => onSelect?.(id), [onSelect]);
 
   return (
-    <div ref={wrap} className={cx('relative overflow-hidden rounded-xl border border-line bg-canvas', className)} style={{ height }}>
+    <div ref={wrap} data-cursor="Drag" className={cx('relative overflow-hidden rounded-xl border border-line bg-canvas', className)} style={{ height }}>
       <svg
         role="img"
         aria-label={ariaLabel}
@@ -335,11 +339,16 @@ export function ForceGraph({
           })}
         </g>
       </svg>
-      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-line bg-surface p-1 shadow-tab">
+      <div data-cursor-off className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-line bg-surface p-1 shadow-tab">
         {toolbar}
-        <button type="button" aria-label="Zoom in" onClick={() => zoomAt(1.25, (wrap.current?.clientWidth ?? 0) / 2, (wrap.current?.clientHeight ?? 0) / 2)} className="flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-body hover:bg-chip">+</button>
-        <button type="button" aria-label="Zoom out" onClick={() => zoomAt(0.8, (wrap.current?.clientWidth ?? 0) / 2, (wrap.current?.clientHeight ?? 0) / 2)} className="flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-body hover:bg-chip">−</button>
-        <button type="button" onClick={fit} className="h-8 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-fg-body hover:bg-chip">Fit</button>
+        {onExpand && (
+          <button type="button" aria-label="Open full screen" title="Full screen" onClick={onExpand} className="ix-btn flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-fg-body">
+            <IconExpand size={15} />
+          </button>
+        )}
+        <button type="button" aria-label="Zoom in" onClick={() => zoomAt(1.25, (wrap.current?.clientWidth ?? 0) / 2, (wrap.current?.clientHeight ?? 0) / 2)} className="ix-btn flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-body hover:bg-chip">+</button>
+        <button type="button" aria-label="Zoom out" onClick={() => zoomAt(0.8, (wrap.current?.clientWidth ?? 0) / 2, (wrap.current?.clientHeight ?? 0) / 2)} className="ix-btn flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-fg-body hover:bg-chip">−</button>
+        <button type="button" onClick={fit} className="ix-btn h-8 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-fg-body hover:bg-chip">Fit</button>
       </div>
       <p className="pointer-events-none absolute bottom-2.5 left-3 m-0 text-11 text-fg-faint">Drag to move · ⌘ or Ctrl + scroll to zoom · click a node for details</p>
     </div>

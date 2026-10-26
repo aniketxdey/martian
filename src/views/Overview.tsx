@@ -117,7 +117,7 @@ function Findings() {
           </thead>
           <tbody>
             {findings.length === 0 && (
-              <tr><td colSpan={5} className="px-[22px] py-10 text-center text-sm text-fg-muted">Nothing yet. Connect an integration and run a scan; findings show up here as agents find them.</td></tr>
+              <tr><td colSpan={5} className="ambient-glow px-[22px] py-10 text-center text-sm text-fg-muted">Nothing yet. Connect an integration and run a scan; findings show up here as agents find them.</td></tr>
             )}
             {findings.map((f) => <FindingRow key={f.id} f={f} onReview={setSelected} />)}
           </tbody>
@@ -182,8 +182,8 @@ function Activity() {
   return (
     <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 rounded-xl border border-line bg-surface px-[22px] py-[18px]">
       <div className="flex items-center justify-between">
-        <Link to="/agents" className="group flex items-center gap-1.5 text-base font-semibold text-fg no-underline">
-          Agent activity <IconArrowRight size={15} className="text-fg-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+        <Link to="/agents" className="ix-underline group flex items-center gap-1.5 text-base font-semibold text-fg no-underline">
+          Agent activity <IconArrowRight size={15} className="ix-arrow text-fg-faint group-hover:text-accent" />
         </Link>
         <span className="flex items-center gap-1.5 text-xs text-ok">
           <span className={cx('h-[7px] w-[7px] rounded-full bg-ok-dot', running > 0 && 'animate-pulse')} />
@@ -212,7 +212,7 @@ function Activity() {
           );
         })}
       </ol>
-      <Link to="/agents" className="mt-auto text-13 font-medium text-accent-link no-underline hover:underline">See every agent run</Link>
+      <Link to="/agents" className="ix-underline ix-link mt-auto text-13 font-medium text-accent-link no-underline hover:underline">See every agent run</Link>
     </section>
   );
 }

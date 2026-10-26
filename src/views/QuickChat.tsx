@@ -54,7 +54,7 @@ function RunPanel({ chat }: { chat: ReturnType<typeof useChat> }) {
       {session && (
         <Link to={`/agents/${session.id}`} className="group flex items-center justify-between gap-2 rounded-[10px] border border-line bg-surface px-3.5 py-3 text-13 font-medium text-fg-2 no-underline hover:border-accent">
           Open the full trace and map
-          <IconArrowRight size={15} className="text-fg-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+          <IconArrowRight size={15} className="ix-arrow text-fg-faint group-hover:text-accent" />
         </Link>
       )}
       {used.length > 0 && (
@@ -112,8 +112,8 @@ export const QuickChat = () => {
         title="Quick Chat"
         meta={<span className="font-mono text-xs text-fg-muted max-sm:hidden">{org}</span>}
         actions={<>
-          <button type="button" onClick={chat.reset} className="flex h-[38px] items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 hover:border-fg-faint"><IconPlus size={14} />New chat</button>
-          <button type="button" aria-pressed={panel} onClick={() => setPanel((v) => !v)} className={cx('h-[38px] rounded-lg border px-3 text-13', panel ? 'border-fg-faint bg-chip text-fg' : 'border-line-strong bg-surface text-fg-2')}>Run panel</button>
+          <button type="button" onClick={chat.reset} className="ix-btn flex h-[38px] items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-13 text-fg-2 hover:border-fg-faint"><IconPlus size={14} />New chat</button>
+          <button type="button" aria-pressed={panel} onClick={() => setPanel((v) => !v)} className={cx('ix-btn h-[38px] rounded-lg border px-3 text-13', panel ? 'border-fg-faint bg-chip text-fg' : 'border-line-strong bg-surface text-fg-2')}>Run panel</button>
         </>}
       />
       <div className="flex flex-1 flex-wrap items-stretch bg-surface lg-app-h lg:flex-none lg:flex-nowrap">
