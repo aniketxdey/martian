@@ -251,7 +251,21 @@ class ChatThread(Base):
     org_id: Mapped[uuid.UUID] = org_fk()
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(300), default="New conversation")
+    # What the conversation is about, e.g. {"kind": "session", "session_id": ..., "session_title": ...}.
+    # Appended to the system prompt on every turn.
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = ts()
+    updated_at: Mapped[datetime] = ts()
+
+
+class DemoSnapshot(Base):
+    """The generated demo world the console last uploaded for an organization (demo mode only)."""
+
+    __tablename__ = "demo_snapshots"
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     updated_at: Mapped[datetime] = ts()
 
 
@@ -294,7 +308,8 @@ class AuditEntry(Base):
     hash: Mapped[str] = mapped_column(String(64), default="")
 
 
-# Tables protected by row-level security (all tenant data).
+# Tables protected by row-level security (all tenant data) as of migration 0001. Tables added
+# later enable RLS in their own migration (0002: demo_snapshots).
 TENANT_TABLES = [
     "connectors",
     "integrations",

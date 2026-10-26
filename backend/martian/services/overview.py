@@ -91,6 +91,7 @@ async def overview(s: AsyncSession, org_id: uuid.UUID) -> dict[str, Any]:
         "waste_identified": float(waste),
         "open_findings": int(open_count),
         "realized_monthly_savings": float(realized),
+        "realized_savings": float(realized),
         "integrations_needing_attention": int(attention),
         "health_score": health_score(float(cost), float(waste), int(attention), age),
         "last_scan_at": last_scan.finished_at.isoformat() if last_scan and last_scan.finished_at else None,

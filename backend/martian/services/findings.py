@@ -35,15 +35,15 @@ async def approve_finding(
     require_role(role, Role.approver)
     finding = await s.get(Finding, finding_id, with_for_update=True)
     if finding is None or finding.org_id != org_id:
-        raise LookupError("finding not found")
+        raise LookupError("That finding doesn't exist anymore.")
     if finding.status != "open":
-        raise FindingStateError(f"finding is {finding.status}")
+        raise FindingStateError(f"This finding is already {finding.status}.")
     if not finding.plan:
-        raise FindingStateError("this finding needs a manual change; there is nothing to run automatically")
+        raise FindingStateError("This finding needs a person to make the change. Martian has nothing to run.")
     for step in finding.plan:
         integration = await s.get(Integration, uuid.UUID(step["integration_id"]))
         if integration is None:
-            raise FindingStateError("integration no longer exists")
+            raise FindingStateError("The integration for this finding was removed.")
         check_write_allowed(integration, step["tool"])
     now = utcnow()
     for step in finding.plan:
@@ -89,9 +89,9 @@ async def dismiss_finding(
     require_role(role, Role.approver)
     finding = await s.get(Finding, finding_id)
     if finding is None or finding.org_id != org_id:
-        raise LookupError("finding not found")
+        raise LookupError("That finding doesn't exist anymore.")
     if finding.status not in {"open", "failed"}:
-        raise FindingStateError(f"finding is {finding.status}")
+        raise FindingStateError(f"This finding is already {finding.status}.")
     finding.status = "dismissed"
     await audit.record(
         s,
@@ -170,7 +170,7 @@ async def run_action(org_id: uuid.UUID, action_id: uuid.UUID, backend: ToolBacke
         integration = await s.get(Integration, action.integration_id)
         try:
             if integration is None:
-                raise PolicyError("integration no longer exists")
+                raise PolicyError("That integration was removed.")
             check_write_allowed(integration, action.tool)  # policy may have changed since approval
         except PolicyError as exc:
             action.status = "failed"

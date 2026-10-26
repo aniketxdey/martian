@@ -123,7 +123,7 @@ async def update_server(
 ) -> dict:
     sv = await s.get(Server, server_id)
     if sv is None:
-        raise HTTPException(404, "server not found")
+        raise HTTPException(404, "That server doesn't exist.")
     for field, col in [
         ("name", "name"),
         ("os", "os"),
@@ -150,7 +150,7 @@ async def delete_server(
 ) -> dict:
     sv = await s.get(Server, server_id)
     if sv is None:
-        raise HTTPException(404, "server not found")
+        raise HTTPException(404, "That server doesn't exist.")
     name = sv.name
     await s.delete(sv)
     await audit.record(
@@ -170,9 +170,9 @@ async def connect(server_id: uuid.UUID, p: Principal = Depends(require(Role.admi
     async with org_session(p.org_id) as s:
         sv = await s.get(Server, server_id)
         if sv is None:
-            raise HTTPException(404, "server not found")
+            raise HTTPException(404, "That server doesn't exist.")
         if not sv.ip_address or not sv.password_ciphertext:
-            raise HTTPException(400, "add an IP address and password first")
+            raise HTTPException(400, "Add an IP address and a password first.")
         sv.status = "connecting"
         integration_id = sv.integration_id
     try:
@@ -207,9 +207,9 @@ async def list_files(
     async with org_session(p.org_id) as s:
         sv = await s.get(Server, server_id)
         if sv is None:
-            raise HTTPException(404, "server not found")
+            raise HTTPException(404, "That server doesn't exist.")
         if sv.status != "connected":
-            raise HTTPException(409, "connect to the server first")
+            raise HTTPException(409, "Connect to the server first.")
         integration_id = sv.integration_id
     result = await MCPBackend(p.org_id, timeout=30).call_tool(
         str(integration_id), "ssh_list_dir", {"host_id": str(server_id), "path": path}

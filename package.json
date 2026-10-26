@@ -1,13 +1,15 @@
 {
   "name": "martian-ai-enterprise",
   "version": "1.0.0",
-  "description": "Intelligent Infrastructure Optimization Platform with Advanced AI Chat",
+  "description": "Martian console: agents that eliminate your infrastructure waste",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:embed": "tsc && vite build --mode embed --base ./ --outDir dist-embed",
     "preview": "vite preview",
+    "preview:embed": "vite preview --outDir dist-embed",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {

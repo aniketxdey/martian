@@ -40,11 +40,16 @@ def _set_session(response: Response, user_id: uuid.UUID, org_id: uuid.UUID) -> N
 
 
 async def _me(user: User, org: Organization, role: str) -> dict:
+    name = user.name or user.email.split("@")[0]
     return {
-        "user": {"id": str(user.id), "email": user.email, "name": user.name or user.email.split("@")[0]},
+        "user": {"id": str(user.id), "email": user.email, "name": name},
         "org": {"id": str(org.id), "name": org.name, "slug": org.slug},
         "role": role,
         "sso_enabled": bool(get_settings().workos_api_key),
+        # Flat copies for the console header.
+        "email": user.email,
+        "name": name,
+        "org_name": org.name,
     }
 
 
@@ -55,7 +60,7 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict:
             await s.execute(select(User).where(func.lower(User.email) == body.email.lower()))
         ).scalar_one_or_none()
         if user is None or not verify_password(body.password, user.password_hash):
-            raise HTTPException(401, "Email or password is incorrect")
+            raise HTTPException(401, "That email and password don't match an account.")
         membership = (
             (
                 await s.execute(
@@ -104,7 +109,7 @@ async def me(p: Principal = Depends(current_principal)) -> dict:
 async def sso_start(email: EmailStr) -> Response:
     s = get_settings()
     if not (s.workos_api_key and s.workos_client_id):
-        raise HTTPException(404, "SSO is not configured")
+        raise HTTPException(404, "SSO isn't configured for this Martian install.")
     domain = email.split("@", 1)[1].lower()
     async with system_session() as db:
         org = (
@@ -131,7 +136,7 @@ async def sso_start(email: EmailStr) -> Response:
 async def sso_callback(code: str, state: str, request: Request) -> Response:
     s = get_settings()
     if not s.workos_api_key or request.cookies.get(SSO_STATE_COOKIE) != state:
-        raise HTTPException(400, "invalid SSO state")
+        raise HTTPException(400, "That sign-in link expired. Start SSO again.")
     async with httpx.AsyncClient(timeout=15) as http:
         r = await http.post(
             "https://api.workos.com/sso/token",
@@ -143,7 +148,7 @@ async def sso_callback(code: str, state: str, request: Request) -> Response:
             },
         )
     if r.status_code != 200:
-        raise HTTPException(401, "SSO sign-in failed")
+        raise HTTPException(401, "SSO sign-in didn't work. Try again or use your password.")
     profile = r.json()["profile"]
     email = profile["email"].lower()
     async with system_session() as db:

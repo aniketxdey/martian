@@ -1,0 +1,14 @@
+interface:
+  display_name: Rewrite Slop
+  short_description: Rewrite AI prose in your natural voice
+  default_prompt: Use $rewrite-slop to rewrite this paragraph so it sounds like me
+    without changing its meaning.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

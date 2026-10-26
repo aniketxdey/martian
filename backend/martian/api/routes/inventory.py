@@ -9,7 +9,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from martian.api.deps import Principal, current_principal, tenant_db
-from martian.db.models import Finding, Resource
+from martian.db.models import Finding, Integration, Resource
+from martian.services.graph import build_graph
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -102,6 +103,17 @@ async def topology(p: Principal = Depends(current_principal), s: AsyncSession = 
         {"value": f"{open_findings:,}", "label": "Open findings"},
     ]
     return {"summary": summary, "groups": groups}
+
+
+@router.get("/graph")
+async def graph(p: Principal = Depends(current_principal), s: AsyncSession = Depends(tenant_db)) -> dict:
+    """Integrations → clusters → services, for the Infrastructure map."""
+    integrations = list(
+        (await s.execute(select(Integration).where(Integration.org_id == p.org_id))).scalars()
+    )
+    resources = list((await s.execute(select(Resource).where(Resource.org_id == p.org_id))).scalars())
+    findings = list((await s.execute(select(Finding).where(Finding.org_id == p.org_id))).scalars())
+    return build_graph(integrations, resources, findings)
 
 
 @router.get("")

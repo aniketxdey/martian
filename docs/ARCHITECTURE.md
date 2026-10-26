@@ -45,13 +45,13 @@ run on their own.
   AES‑256‑GCM (envelope‑encrypted with AWS KMS in production) and delivered only to
   the connector that owns that integration.
 - **MCP everywhere.** Every integration is an MCP server with named tools, marked
-  read or write. The same tools serve the scan pipeline, the chat agent and the
-  Integrations page, where admins switch tools on and off and pick a permission mode
+  read or write. Scans and the chat agent call the same tools, and the Integrations
+  page lists them so admins can switch each one on or off and pick a permission mode
   (`read`, `ask`, `auto`).
 - **Deterministic detection, LLM orchestration.** Findings come from explicit,
   tested rules over normalized inventory and metrics, so savings figures are
-  reproducible and auditable. Claude explains, answers questions and plans
-  multi‑step work; it never invents a number.
+  reproducible and auditable. Claude explains them and plans multi‑step work, but it
+  never invents a number.
 - **Human in the loop by construction.** Write tool calls pass through an approval
   node that uses LangGraph `interrupt()`. Graph state is checkpointed in Postgres,
   so a pending approval survives restarts and deploys.
@@ -59,8 +59,8 @@ run on their own.
   risk and savings policy without a person. Free‑form write calls from chat always
   wait for approval, because tool output can carry prompt‑injected instructions.
 - **Tenant URLs never reach internal networks.** Custom MCP servers are proxied
-  through an egress guard. It allows public HTTPS only, checks the address at connect
-  time, refuses redirects, and blocks metadata, loopback and private ranges.
+  through an egress guard that allows public HTTPS only. It checks the address at
+  connect time and refuses redirects, so metadata and private ranges stay unreachable.
   Private servers belong behind the customer's connector.
 - **Postgres is the only stateful dependency.** App data, the job queue
   (`FOR UPDATE SKIP LOCKED`) and LangGraph checkpoints share one managed database.
@@ -75,12 +75,28 @@ run on their own.
    asks the forecast service for demand forecasts on compute with metric history,
    runs the findings rules and upserts findings (dismissed findings stay dismissed).
 2. **Approve a finding.** `POST /findings/{id}/approve` checks role, integration
-   mode and tool policy, records the approval and enqueues `execute_finding`. The
-   executor re‑reads the resource (preflight), applies the write tool, verifies the
-   result, stores the rollback arguments and updates realized savings.
+   mode and tool policy, then records the approval and enqueues `execute_finding`. The
+   executor re‑reads the resource first and only then applies the write tool. Once the
+   result checks out, it keeps the rollback arguments and updates realized savings.
 3. **Chat.** `POST /chat/threads/{id}/messages` streams a LangGraph run over SSE.
    Read tools run immediately. Write tools pause the run with an approval card;
-   `POST /chat/threads/{id}/resume` continues it.
+   `POST /chat/threads/{id}/resume` continues it. `tool_end` events carry the first
+   2,000 characters of each result so the console can show it in the trace. A thread
+   can carry a `context` (for example the agent run it was opened from), which is
+   added to the system prompt on every turn.
+4. **Agent runs.** `GET /agents/sessions` lists conversations and scans as agent runs,
+   along with approved changes; `GET /agents/sessions/{id}` returns one with every agent and
+   step. `GET /inventory/graph` returns integrations → clusters → services for the
+   Infrastructure map, and findings carry the `node_id` they belong to.
+
+## Skills
+
+Markdown files in `backend/martian/agents/skills/` are appended to the chat agent's
+system prompt on every turn. `writing_style.md` condenses the two writing skills in
+`.claude/skills/` (anti‑AI‑slop and rewrite) into rules for answers, including a
+condensed copy of the banned word list. The short version: lead with the number and
+ground it in a tool result.
+The offline planner and the console's demo planner follow the same rules.
 
 ## Modes
 
@@ -88,11 +104,17 @@ run on their own.
   same tool contracts, so the whole product runs without cloud accounts.
 - Without `ANTHROPIC_API_KEY` the chat agent falls back to a deterministic offline
   planner over the same tools (useful for demos and tests).
+- `MARTIAN_DEMO_MODE=true` makes `GET /demo/config` tell the console to generate a
+  sample company. The console uploads a snapshot of it before each chat turn, and the
+  agent swaps its internal tools for demo tools that read that snapshot
+  (`get_overview`, `list_findings`, `describe_topology`, `get_resource_telemetry`,
+  `get_agent_session` and others). `approve_finding` still goes through the approval
+  gate; `start_workflow` is read‑only. The forecast service stays real.
 
 ## Deployment
 
-Containers for every service, docker compose for a single host, and Terraform for AWS
-(ECS Fargate, RDS, ALB with WAF, KMS, CloudFront) live in `deploy/` and the service
-directories. Customer‑side setup uses a Helm chart for the connector, plus
-CloudFormation, Azure and GCP scripts for least‑privilege access. See
+Every service ships as a container. Docker compose runs them on one host, and the
+Terraform in `deploy/` puts them on AWS (ECS Fargate, RDS, ALB with WAF, KMS,
+CloudFront). Customer‑side setup uses a Helm chart for the connector, plus a
+least‑privilege access script for each cloud. See
 [DEPLOYMENT.md](DEPLOYMENT.md).

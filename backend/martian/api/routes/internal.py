@@ -49,7 +49,7 @@ async def config(connector_id: uuid.UUID) -> dict:
     async with system_session() as s:
         c = await s.get(Connector, connector_id)
         if c is None:
-            raise HTTPException(404, "connector revoked")
+            raise HTTPException(404, "That connector was revoked.")
         return {
             "connector_id": str(c.id),
             "org_id": str(c.org_id),
@@ -67,7 +67,7 @@ async def status(connector_id: uuid.UUID, body: StatusBody) -> dict:
     async with system_session() as s:
         c = await s.get(Connector, connector_id)
         if c is None:
-            raise HTTPException(404, "connector revoked")
+            raise HTTPException(404, "That connector was revoked.")
         changed = c.status != body.status
         c.status = body.status
         c.last_seen_at = utcnow()
@@ -91,7 +91,7 @@ async def route(integration_id: uuid.UUID) -> dict:
     async with system_session() as s:
         i = await s.get(Integration, integration_id)
         if i is None or not i.enabled:
-            raise HTTPException(404, "integration not found or disabled")
+            raise HTTPException(404, "That integration doesn't exist or is turned off.")
         if i.kind == "custom" and (i.config or {}).get("transport") != "stdio":
             secrets = decrypt_json(i.secrets_ciphertext)
             headers = {"Authorization": secrets["authorization"]} if secrets.get("authorization") else {}
@@ -102,5 +102,5 @@ async def route(integration_id: uuid.UUID) -> dict:
                 "headers": headers,
             }
         if i.connector_id is None:
-            raise HTTPException(409, "integration has no connector")
+            raise HTTPException(409, "This integration isn't attached to a connector yet.")
         return {"type": "connector", "org_id": str(i.org_id), "connector_id": str(i.connector_id)}
