@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 export interface Message {
-  id: number;
+  id: number | string;
   type: 'user' | 'ai';
   content: string;
   timestamp: string;

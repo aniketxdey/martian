@@ -1,0 +1,115 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      MARTIAN_TEST_PG: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv python install 3.12
+      # CPU wheels keep CI fast; the forecast tests need torch.
+      - run: uv sync --frozen --extra dev --extra kms && uv pip install torch numpy --index-url https://download.pytorch.org/whl/cpu
+      - run: uv run --no-sync ruff check martian tests
+      - run: uv run --no-sync ruff format --check martian tests
+      - run: uv run --no-sync pytest -q
+
+  mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Build demo bundle
+        run: npx vite build
+      - name: Build live bundle
+        run: npx vite build --outDir dist-live
+        env:
+          VITE_API_URL: https://api.example.com
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.4"
+      - run: terraform -chdir=deploy/terraform/aws fmt -check -recursive
+      - run: terraform -chdir=deploy/terraform/aws init -backend=false
+      - run: terraform -chdir=deploy/terraform/aws validate
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/martian-connector --set token=ci
+      - run: helm template ci deploy/helm/martian-connector --set token=ci > /dev/null
+      - run: pipx run cfn-lint deploy/onboarding/aws/*.yaml
+      - run: bash -n deploy/onboarding/azure/setup.sh deploy/onboarding/gcp/setup.sh
+      - run: docker compose config -q
+
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: control-plane, context: backend, target: app }
+          - { name: forecast, context: backend, target: forecast }
+          - { name: gateway, context: mcp, target: gateway }
+          - { name: connector, context: mcp, target: connector }
+          - { name: web, context: ., file: Dockerfile.web }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file && format('{0}/{1}', matrix.context, matrix.file) || format('{0}/Dockerfile', matrix.context) }}
+          target: ${{ matrix.target }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

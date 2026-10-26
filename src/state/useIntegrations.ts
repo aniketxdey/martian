@@ -1,7 +1,7 @@
 // Integrations state (front-end only, local React state).
 // When a real backend exists, this hook is the only file to swap.
 import { useMemo, useState } from 'react';
-import { CATALOG, DISCOVERED_TOOLS, Integration, PermissionMode } from '../data/integrations';
+import { CATALOG, DISCOVERED_TOOLS, Integration, PermissionMode, TOOL_LOG } from '../data/integrations';
 
 export type Transport = 'http' | 'stdio';
 
@@ -33,7 +33,7 @@ export const useIntegrations = () => {
   });
 
   /** Adds a custom MCP server in "Needs auth", then mock-discovers three tools. */
-  const addCustom = (name: string, transport: Transport) => {
+  const addCustom = (name: string, transport: Transport, _url = '', _authorization = '') => {
     const id = `custom-${Date.now()}`;
     const item: Integration = {
       id, cat: 'custom', mono: 'MCP', name: name.trim() || 'Custom MCP server',
@@ -58,5 +58,12 @@ export const useIntegrations = () => {
       .reduce((n, c) => n + toolsOf(c).filter((t) => t.on && t.write).length, 0),
   };
 
-  return { all, summary, modeOf, toolsOf, isOn, toggleIntegration, disconnect, toggleTool, setMode, turnOffWrites, addCustom };
+  const saveConnection = async (_c: Integration, _values: Record<string, string>) => undefined;
+  const test = (_id: string) => new Promise<{ ok: boolean; error: string | null }>((r) => setTimeout(() => r({ ok: true, error: null }), 1500));
+  const recentCalls = async (id: string) => TOOL_LOG[id] ?? TOOL_LOG.other;
+
+  return {
+    live: false as boolean, all, summary, modeOf, toolsOf, isOn, toggleIntegration, disconnect, toggleTool, setMode, turnOffWrites, addCustom,
+    saveConnection, test, recentCalls,
+  };
 };

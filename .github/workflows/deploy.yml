@@ -1,0 +1,148 @@
+name: deploy
+
+# Builds images, migrates the database and rolls the ECS services, then publishes the
+# console. Requires the AWS stack from deploy/terraform/aws and these repository
+# variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN (OIDC), ECS_CLUSTER, WEB_BUCKET,
+# CLOUDFRONT_DISTRIBUTION_ID, API_URL, PRIVATE_SUBNETS (comma separated), SERVICE_SG,
+# DOMAIN and TF_ENV (Terraform `env`). Terraform state must use a remote backend.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # AWS OIDC
+  packages: write # GHCR (customer-facing connector image and chart)
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  images:
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: control-plane, context: backend, target: app }
+          - { name: forecast, context: backend, target: forecast }
+          - { name: gateway, context: mcp, target: gateway }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platforms: linux/arm64 # Fargate Graviton
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/martian/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}-arm64
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-arm64
+          provenance: true
+          sbom: true
+
+  connector:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: mcp
+          target: connector
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/martian-connector:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/martian-connector:latest
+          provenance: true
+          sbom: true
+      - uses: azure/setup-helm@v4
+      - run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          helm package deploy/helm/martian-connector --version "$VERSION" --app-version "$GITHUB_REF_NAME"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "martian-connector-$VERSION.tgz" "oci://ghcr.io/${{ github.repository_owner }}/charts"
+
+  release:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      TF_VAR_domain: ${{ vars.DOMAIN }}
+      TF_VAR_env: ${{ vars.TF_ENV }}
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.4"
+      # Task definitions pin image_tag; apply registers new revisions and rolls services
+      # (circuit breaker rolls back automatically on failed health checks).
+      - name: Register task definitions with the new image
+        working-directory: deploy/terraform/aws
+        run: |
+          terraform init
+          terraform apply -auto-approve -var image_tag=${{ github.sha }} \
+            -target=aws_ecs_task_definition.migrate
+      - name: Migrate database
+        run: |
+          FAMILY=$(terraform -chdir=deploy/terraform/aws output -raw migrate_task_definition)
+          TASK=$(aws ecs run-task --cluster "${{ vars.ECS_CLUSTER }}" --launch-type FARGATE \
+            --task-definition "$FAMILY" \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ vars.PRIVATE_SUBNETS }}],securityGroups=[${{ vars.SERVICE_SG }}]}" \
+            --query 'tasks[0].taskArn' --output text)
+          aws ecs wait tasks-stopped --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$TASK"
+          CODE=$(aws ecs describe-tasks --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$TASK" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          test "$CODE" = "0" || { echo "migration failed (exit $CODE)"; exit 1; }
+      - name: Roll services
+        working-directory: deploy/terraform/aws
+        run: terraform apply -auto-approve -var image_tag=${{ github.sha }}
+      - name: Wait for services to stabilize
+        run: aws ecs wait services-stable --cluster "${{ vars.ECS_CLUSTER }}" --services api worker gateway forecast
+
+  web:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npx vite build
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: |
+          aws s3 sync dist/assets "s3://${{ vars.WEB_BUCKET }}/assets" --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp dist/index.html "s3://${{ vars.WEB_BUCKET }}/index.html" --cache-control "no-cache"
+          aws s3 sync dist "s3://${{ vars.WEB_BUCKET }}" --exclude "assets/*" --exclude index.html --delete
+          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths /index.html
