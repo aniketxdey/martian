@@ -3,14 +3,22 @@
  * agent over SSE. Adds the pending approval (a write tool call paused for a person)
  * and the tool steps of the latest run for the agent run panel.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { ApiError, post, stream } from '../api/client';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { api, ApiError, post, stream } from '../api/client';
 import type { Message } from './useMartianChat';
 
 export type RunStep = { id?: string; tool: string; title: string; detail: string; status: 'pending' | 'done' | 'failed'; seconds?: number };
 export type PendingApproval = {
   type: 'approval';
   actions: { tool_call_id: string; tool: string; args: Record<string, unknown>; integration: string | null }[];
+};
+export type ThreadSummary = { id: string; title: string; updated_at: string };
+
+// The open conversation survives navigation and reloads; "New conversation" clears it.
+const THREAD_KEY = 'martian.chat.thread';
+const storedThread = () => { try { return localStorage.getItem(THREAD_KEY); } catch { return null; } };
+const storeThread = (id: string | null) => {
+  try { if (id) localStorage.setItem(THREAD_KEY, id); else localStorage.removeItem(THREAD_KEY); } catch { /* storage disabled */ }
 };
 
 const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -33,27 +41,74 @@ export const useChatLive = (showWelcome = true) => {
   const [run, setRun] = useState<RunStep[]>([]);
   const [runSeconds, setRunSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const threadId = useRef<string | null>(null);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [activeThread, setActiveThread] = useState<string | null>(storedThread);
+  const threadId = useRef<string | null>(activeThread);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const runRef = useRef<RunStep[]>(run);
+  runRef.current = run;
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' }); }, [messages, isTyping, pending]);
 
+  const setThread = (id: string | null) => {
+    threadId.current = id;
+    setActiveThread(id);
+    storeThread(id);
+  };
+
+  const applyView = (view: { messages: any[]; pending_approval: PendingApproval | null; run: RunStep[] }, prevRun: RunStep[] = []) => {
+    setMessages([...(showWelcome ? [WELCOME] : []), ...view.messages.map((m: any) => ({ ...m, timestamp: fmtTs(m.timestamp) }))]);
+    setPending(view.pending_approval);
+    setRun(view.run.map((s, i) => ({ ...s, title: title(s.tool), seconds: prevRun[i]?.seconds })));
+  };
+
+  const refreshThreads = useCallback(async () => {
+    try { setThreads((await api<{ threads: ThreadSummary[] }>('/chat/threads')).threads); } catch { /* list is best-effort */ }
+  }, []);
+
+  /** Load a saved conversation into the chat. */
+  const openThread = async (id: string) => {
+    if (isTyping) return;
+    setError(null);
+    setRunSeconds(null);
+    try {
+      applyView(await api(`/chat/threads/${id}`));
+      setThread(id);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setThread(null);
+        void refreshThreads();
+      } else {
+        setError((e as Error).message);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (threadId.current) void openThread(threadId.current);
+    void refreshThreads();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Start a fresh conversation; earlier ones stay in the thread list. */
+  const reset = () => setThread(null);
+
   const consume = async (path: string, body: unknown) => {
     const started = Date.now();
-    const draftId = `draft-${started}`;
+    let draftId = `draft-${started}`;
     setIsTyping(true);
     setError(null);
     try {
       for await (const e of stream(path, body)) {
         if (e.event === 'token') {
+          const id = draftId;
           setMessages((ms) => {
             const last = ms[ms.length - 1];
-            if (last?.id === draftId) return [...ms.slice(0, -1), { ...last, content: last.content + e.data.text }];
-            return [...ms, { id: draftId, type: 'ai', content: e.data.text, timestamp: now() }];
+            if (last?.id === id) return [...ms.slice(0, -1), { ...last, content: last.content + e.data.text }];
+            return [...ms, { id, type: 'ai', content: e.data.text, timestamp: now() }];
           });
         } else if (e.event === 'tool_start') {
-          // Text streamed before a tool call is the model thinking aloud; the final answer replaces it.
-          setMessages((ms) => ms.filter((m) => m.id !== draftId));
+          // Text streamed before a tool call stays in the chat; anything after it starts a new message.
+          draftId = `draft-${started}-${e.data.id}`;
           setRun((r) => (r.some((s) => s.id === e.data.id) ? r : [...r, { id: e.data.id, tool: e.data.tool, title: title(e.data.tool), detail: detail(e.data.args), status: 'pending' }]));
         } else if (e.event === 'tool_end') {
           setRun((r) => r.map((s) => (s.id === e.data.id ? { ...s, status: e.data.ok ? 'done' : 'failed', seconds: e.data.seconds } : s)));
@@ -62,10 +117,7 @@ export const useChatLive = (showWelcome = true) => {
         } else if (e.event === 'error') {
           setError(e.data.message);
         } else if (e.event === 'done') {
-          const view = e.data;
-          setMessages([...(showWelcome ? [WELCOME] : []), ...view.messages.map((m: any) => ({ ...m, timestamp: fmtTs(m.timestamp) }))]);
-          setPending(view.pending_approval);
-          setRun((prev) => view.run.map((s: RunStep, i: number) => ({ ...s, title: title(s.tool), seconds: prev[i]?.seconds })));
+          applyView(e.data, runRef.current);
         }
       }
     } catch (e) {
@@ -73,6 +125,7 @@ export const useChatLive = (showWelcome = true) => {
     } finally {
       setIsTyping(false);
       setRunSeconds(Math.round((Date.now() - started) / 1000));
+      void refreshThreads();
     }
   };
 
@@ -82,7 +135,7 @@ export const useChatLive = (showWelcome = true) => {
     setInputValue('');
     setRun([]);
     try {
-      if (!threadId.current) threadId.current = (await post('/chat/threads')).id;
+      if (!threadId.current) setThread((await post('/chat/threads')).id);
     } catch (e) {
       setError((e as Error).message);
       return;
@@ -110,5 +163,6 @@ export const useChatLive = (showWelcome = true) => {
     messages, inputValue, setInputValue, isTyping, messagesEndRef,
     handleQuickAction, handleSendMessage, handleSubmit, handleKeyPress,
     pending, decide, run, runSeconds, error,
+    threads, activeThread, openThread, reset,
   };
 };

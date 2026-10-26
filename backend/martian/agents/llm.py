@@ -21,9 +21,7 @@ def get_chat_model() -> BaseChatModel:
     if s.anthropic_api_key:
         from langchain_anthropic import ChatAnthropic
 
-        return ChatAnthropic(
-            model=s.anthropic_model, api_key=s.anthropic_api_key, max_tokens=4096, temperature=0
-        )
+        return ChatAnthropic(model=s.anthropic_model, api_key=s.anthropic_api_key, max_tokens=4096)
     return OfflinePlanner()
 
 

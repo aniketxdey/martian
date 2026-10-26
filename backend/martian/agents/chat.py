@@ -112,6 +112,7 @@ def build_graph(org_id: uuid.UUID, toolset: AgentToolset, model=None) -> StateGr
 
     async def agent(state: ChatState, config: RunnableConfig) -> dict[str, Any]:
         response = await model.ainvoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]], config)
+        response.additional_kwargs["ts"] = utcnow().isoformat()
         return {"messages": [response]}
 
     def route(state: ChatState) -> str:
@@ -300,7 +301,9 @@ async def run_turn(
     if resume is not None:
         inputs: Any = Command(resume={**resume, "user_id": user.get("user_id")})
     else:
-        inputs = {"messages": [HumanMessage(content=message or "")]}
+        inputs = {
+            "messages": [HumanMessage(content=message or "", additional_kwargs={"ts": utcnow().isoformat()})]
+        }
     started: dict[str, float] = {}
     try:
         async for mode, chunk in graph.astream(inputs, config, stream_mode=["messages", "updates"]):
@@ -373,7 +376,9 @@ def to_ui_messages(messages: list[AnyMessage]) -> list[dict[str, Any]]:
         ts = (m.additional_kwargs or {}).get("ts")
         if isinstance(m, HumanMessage):
             out.append({"id": m.id or f"m{i}", "type": "user", "content": _text(m.content), "timestamp": ts})
-        elif isinstance(m, AIMessage) and not m.tool_calls and _text(m.content).strip():
+        elif isinstance(m, AIMessage) and _text(m.content).strip():
+            # Text written alongside tool calls is part of the answer too; only the final
+            # message of a turn gets follow-up suggestions.
             text = _text(m.content)
             out.append(
                 {
@@ -381,7 +386,7 @@ def to_ui_messages(messages: list[AnyMessage]) -> list[dict[str, Any]]:
                     "type": "ai",
                     "content": text,
                     "timestamp": ts,
-                    "quickActions": suggestions(text),
+                    "quickActions": [] if m.tool_calls else suggestions(text),
                 }
             )
     return out

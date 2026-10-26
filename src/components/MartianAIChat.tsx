@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useMartianChat, Message } from '../state/useMartianChat';
 import { PendingApproval, useChatLive } from '../state/useChatLive';
-import { LIVE } from '../api/client';
+import { LIVE, timeAgo } from '../api/client';
 import { RUN_STEPS } from '../data/presentation';
 import { IconArrowUp, IconCheck, IconPlus, IconShield, MartianMark } from '../ui/icons';
 import { Badge, cx } from '../ui/kit';
@@ -244,7 +244,7 @@ export const useMartianChatView = ({
 
   return {
     header: (
-      <button type="button" onClick={onNewConversation} className="flex h-[38px] items-center gap-2 rounded-lg border border-line-strong bg-white px-3 text-[13px] text-fg-2">
+      <button type="button" onClick={() => { live?.reset(); onNewConversation(); }} className="flex h-[38px] items-center gap-2 rounded-lg border border-line-strong bg-white px-3 text-[13px] text-fg-2">
         <IconPlus size={14} />New conversation
       </button>
     ),
@@ -311,7 +311,7 @@ export const useMartianChatView = ({
               <h2 className="m-0 text-[15px] font-semibold">Agent run</h2>
               {chat.isTyping ? <Badge tone="accent">Running</Badge>
                 : live?.pending ? <Badge tone="accent">Waiting for approval</Badge>
-                : hasRun ? <Badge tone="ok">Completed · {live ? `${live.runSeconds ?? 0}s` : '11s'}</Badge> : <Badge tone="neutral">Idle</Badge>}
+                : hasRun ? <Badge tone="ok">Completed{live ? (live.runSeconds != null ? ` · ${live.runSeconds}s` : '') : ' · 11s'}</Badge> : <Badge tone="neutral">Idle</Badge>}
             </div>
             {live && hasRun ? (
               live.run.length === 0 ? (
@@ -358,6 +358,30 @@ export const useMartianChatView = ({
                 ))}
               </div>
             </div>
+            {live && live.threads.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <h3 className="m-0 text-[13px] font-semibold text-fg-body">Recent conversations</h3>
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {live.threads.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        aria-current={t.id === live.activeThread ? 'true' : undefined}
+                        disabled={chat.isTyping}
+                        onClick={() => void live.openThread(t.id)}
+                        className={cx(
+                          'flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left text-[13px] disabled:opacity-60',
+                          t.id === live.activeThread ? 'border-line-strong bg-white text-fg' : 'border-transparent text-fg-2 hover:bg-white',
+                        )}
+                      >
+                        <span className="min-w-0 truncate">{t.title}</span>
+                        <span className="flex-none font-mono text-xs text-fg-faint">{timeAgo(t.updated_at)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="m-0 flex gap-2.5 rounded-[10px] border border-line bg-white px-3.5 py-3 text-[13px] leading-normal text-fg-body">
               <IconShield size={16} color="#15803D" className="mt-0.5 flex-none" />
               {live ? 'Write tools pause for approval. Every call is recorded in the audit log.' : 'Read-only run. No resources were changed.'}

@@ -12,3 +12,4 @@ mcp/dist/
 # local env
 .env
 dist-live/
+.dev-logs/
