@@ -160,17 +160,6 @@ function ErrorBar() {
   );
 }
 
-function DemoRibbon() {
-  const mode = useApp((s) => s.mode);
-  const org = useApp((s) => s.user.org);
-  if (!mode.demo || !EMBED) return null;
-  return (
-    <div className="sticky top-0 z-40 box-border flex h-7 items-center justify-center gap-2 overflow-hidden bg-accent px-4 text-center text-xs font-medium text-white">
-      Interactive demo with sample data for {org}. Nothing here touches real infrastructure.
-    </div>
-  );
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { navigate } = useRouter();
   // ⌘K / Ctrl+K opens Quick Chat.
@@ -186,8 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   return (
-    <div className="flex min-h-screen w-full flex-col" style={{ '--ribbon-h': EMBED ? '28px' : '0px' } as React.CSSProperties}>
-      <DemoRibbon />
+    <div className="flex min-h-screen w-full flex-col">
       <Cursor />
       <div className="flex min-h-0 w-full flex-1 flex-wrap bg-canvas md:flex-nowrap">
         <Sidebar />
