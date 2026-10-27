@@ -58,7 +58,7 @@ const NodeShape = memo(function NodeShape({ n, selected, dim, hot, show, outward
   onEnter: (id: string) => void; onLeave: () => void; onClick: (id: string) => void;
 }) {
   const tone = TONE[n.tone ?? 'neutral'];
-  const logo = n.logo === 'martian' ? asset('martian-logo.png') : n.logo ? (CATALOG_BY_ID[n.logo]?.logo ? asset(CATALOG_BY_ID[n.logo]!.logo!) : null) : null;
+  const logo = n.logo === 'martian' ? asset('martian-mark.svg') : n.logo ? (CATALOG_BY_ID[n.logo]?.logo ? asset(CATALOG_BY_ID[n.logo]!.logo!) : null) : null;
   const inner = n.r * 1.15;
   return (
     <g
@@ -90,12 +90,7 @@ const NodeShape = memo(function NodeShape({ n, selected, dim, hot, show, outward
       )}
       {logo ? (
         n.logo === 'martian'
-          ? (
-            <>
-              <clipPath id={`clip-${n.id.replace(/[^\w-]/g, '_')}`}><circle r={n.r - 1.5} /></clipPath>
-              <image href={logo} x={-n.r * 1.5} y={-n.r * 1.5} width={n.r * 3} height={n.r * 3} clipPath={`url(#clip-${n.id.replace(/[^\w-]/g, '_')})`} />
-            </>
-          )
+          ? <image href={logo} x={-n.r * 0.75} y={-n.r * 0.75} width={n.r * 1.5} height={n.r * 1.5} preserveAspectRatio="xMidYMid meet" />
           : <image href={logo} x={-inner / 2} y={-inner / 2} width={inner} height={inner} preserveAspectRatio="xMidYMid meet" />
       ) : (
         <text textAnchor="middle" dominantBaseline="central" className="select-none fill-fg font-mono" style={{ fontSize: Math.max(9, n.r * 0.55), fontWeight: 600 }}>

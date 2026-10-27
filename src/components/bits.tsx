@@ -7,8 +7,8 @@ import { cx } from '../ui/kit';
 
 /** Martian's own mark (used for forecast and internal tools). */
 export const MartianGlyph = ({ size = 18 }: { size?: number }) => (
-  <span className="relative block flex-none overflow-hidden" style={{ width: size, height: size }}>
-    <img src={asset('martian-logo.png')} alt="" className="absolute max-w-none" style={{ width: size * 1.86, height: size * 1.86, left: -size * 0.43, top: -size * 0.43 }} />
+  <span className="flex flex-none items-center justify-center" style={{ width: size, height: size }}>
+    <img src={asset('martian-mark.svg')} alt="" className="block h-full w-auto" />
   </span>
 );
 

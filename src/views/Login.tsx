@@ -24,7 +24,7 @@ export const Login = () => {
     <div className="flex min-h-screen w-full flex-wrap bg-surface">
       <section className="ambient-glow flex min-h-[420px] flex-[1_1_520px] flex-col justify-between gap-10 bg-ink px-14 py-12 text-white max-sm:px-6">
         <div className="flex items-center gap-2.5 text-xl font-semibold">
-          <MartianMark box={30} img={56} offset={-13} />
+          <MartianMark box={30} />
           Martian
         </div>
         <div className="flex max-w-[520px] flex-col gap-6">

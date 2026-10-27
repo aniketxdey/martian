@@ -7,8 +7,8 @@ import { Badge, cx } from '../../ui/kit';
 import { Markdown } from '../Markdown';
 
 export const AgentAvatar = ({ size = 32 }: { size?: number }) => (
-  <span className="relative flex-none overflow-hidden rounded-[9px] bg-ink" style={{ width: size, height: size }}>
-    <img src={asset('martian-logo.png')} alt="" className="absolute max-w-none" style={{ width: size * 1.62, height: size * 1.62, left: -size * 0.31, top: -size * 0.31 }} />
+  <span className="flex flex-none items-center justify-center rounded-[9px] bg-ink" style={{ width: size, height: size }}>
+    <img src={asset('martian-mark.svg')} alt="" className="block w-auto" style={{ height: Math.round(size * 0.72) }} />
   </span>
 );
 
