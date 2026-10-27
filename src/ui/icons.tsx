@@ -72,9 +72,9 @@ export const IconPlay = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg>
 );
 
-/** The Martian alien mark, cropped from the brand PNG exactly as in the design. */
-export const MartianMark = ({ box = 28, img = 52, offset = -12 }: { box?: number; img?: number; offset?: number }) => (
-  <span className="relative block flex-none overflow-hidden" style={{ width: box, height: box }}>
-    <img src={asset('martian-logo.png')} alt="" className="absolute max-w-none" style={{ width: img, height: img, left: offset, top: offset }} />
+/** The Martian alien mark: the whole head, as tall as the box, centered in it. */
+export const MartianMark = ({ box = 28 }: { box?: number }) => (
+  <span className="flex flex-none items-center justify-center" style={{ width: box, height: box }}>
+    <img src={asset('martian-mark.svg')} alt="" className="block h-full w-auto" />
   </span>
 );

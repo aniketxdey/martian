@@ -63,7 +63,7 @@ function Routes() {
 function Splash() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink">
-      <span className="animate-pulse"><MartianMark box={44} img={82} offset={-19} /></span>
+      <span className="animate-pulse"><MartianMark box={44} /></span>
     </div>
   );
 }
