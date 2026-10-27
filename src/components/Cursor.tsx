@@ -41,7 +41,13 @@ export function Cursor() {
       const now = !!region;
       if (now !== on) {
         on = now;
-        if (on) { rx = x; ry = y; }
+        if (on) {
+          // Show up under the pointer, not wherever the ring was last drawn.
+          rx = x; ry = y;
+          const at = `translate3d(${x}px, ${y}px, 0)`;
+          if (ring.current) ring.current.style.transform = at;
+          if (dot.current) dot.current.style.transform = at;
+        }
         ring.current?.classList.toggle('is-on', on);
         dot.current?.classList.toggle('is-on', on);
         root.classList.toggle('cursor-active', on);
