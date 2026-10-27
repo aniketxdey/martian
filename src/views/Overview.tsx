@@ -3,7 +3,7 @@ import { Link, useRouter } from '../app/router';
 import { useActions, useApp } from '../app/store';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { IntegrationLogo, usd } from '../components/bits';
-import { AskButton, Page, PageHeader, WastePill } from '../shell/AppShell';
+import { Page, PageHeader, WastePill } from '../shell/AppShell';
 import type { UiFinding } from '../state/types';
 import { IconArrowRight, IconCheck, IconRefresh } from '../ui/icons';
 import { Badge, Button, Card, cx, Drawer } from '../ui/kit';
@@ -226,7 +226,7 @@ export const Overview = () => {
 
   return (
     <>
-      <PageHeader title="Overview" actions={<><AskButton /><WastePill /></>} />
+      <PageHeader title="Overview" actions={<WastePill />} />
       <Page>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-col gap-1.5">
@@ -237,7 +237,7 @@ export const Overview = () => {
             <Button onClick={() => (scan.running && scan.sessionId ? navigate(`/agents/${scan.sessionId}`) : void runScan())}>
               <IconRefresh size={16} className={cx(scan.running && 'animate-spin')} />{scan.running ? 'Watch the scan' : 'Run a scan'}
             </Button>
-            <Button variant="primary" onClick={() => navigate('/chat')}>Ask Martian</Button>
+            <Button variant="primary" onClick={() => navigate('/chat')}>Quick Chat</Button>
           </div>
         </div>
         <Stats />
