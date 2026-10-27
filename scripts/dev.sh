@@ -25,6 +25,8 @@ export MARTIAN_APP_DB_PASSWORD="${MARTIAN_APP_DB_PASSWORD:-martian}"
 export MARTIAN_INTERNAL_TOKEN="${MARTIAN_INTERNAL_TOKEN:-dev-internal-token-change-me}"
 export MARTIAN_DATABASE_URL="postgresql+psycopg://martian_app:${MARTIAN_APP_DB_PASSWORD}@localhost/martian"
 export MARTIAN_WEB_ORIGIN=http://localhost:5173
+# Generated demo data (five sample companies, new seed per visit). Set false in .env for real inventory.
+export MARTIAN_DEMO_MODE="${MARTIAN_DEMO_MODE:-true}"
 CONNECTOR_TOKEN="${MARTIAN_DEMO_CONNECTOR_TOKEN:-mct_demo_sandbox_connector_token_do_not_use_in_production}"
 
 brew services start postgresql@16 >/dev/null

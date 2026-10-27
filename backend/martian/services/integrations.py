@@ -24,7 +24,7 @@ CATALOG: list[dict[str, Any]] = [
         "mono": "AWS",
         "name": "Amazon Web Services",
         "transport": "connector",
-        "desc": "EC2, EBS, RDS, load balancers, NAT gateways, Auto Scaling and Cost Explorer.",
+        "desc": "EC2 and RDS fleets with the volumes and load balancers around them, priced with Cost Explorer.",
         "config_fields": [
             {"key": "accounts", "label": "Accounts (role ARNs)", "type": "list"},
             {"key": "regions", "label": "Regions", "type": "list"},
@@ -36,7 +36,7 @@ CATALOG: list[dict[str, Any]] = [
         "mono": "AZ",
         "name": "Microsoft Azure",
         "transport": "connector",
-        "desc": "VMs, managed disks and Cost Management for your subscriptions.",
+        "desc": "VMs and SQL databases across your subscriptions, priced with Cost Management.",
         "config_fields": [{"key": "subscription_ids", "label": "Subscription IDs", "type": "list"}],
     },
     {
@@ -45,7 +45,7 @@ CATALOG: list[dict[str, Any]] = [
         "mono": "GCP",
         "name": "Google Cloud",
         "transport": "connector",
-        "desc": "Compute Engine, persistent disks and Cloud Monitoring.",
+        "desc": "Compute Engine and Cloud SQL, with utilization from Cloud Monitoring.",
         "config_fields": [{"key": "project_ids", "label": "Project IDs", "type": "list"}],
     },
     {
@@ -54,7 +54,7 @@ CATALOG: list[dict[str, Any]] = [
         "mono": "VC",
         "name": "VMware vCenter",
         "transport": "connector",
-        "desc": "Hosts, clusters, VMs and datastores in your data center.",
+        "desc": "Every host and VM in your data center, grouped by cluster.",
         "config_fields": [
             {"key": "url", "label": "vCenter URL", "type": "text"},
             {"key": "username", "label": "Username", "type": "text"},
@@ -89,7 +89,7 @@ COMING_SOON: list[dict[str, Any]] = [
         "cat": "infra",
         "mono": "K8S",
         "name": "Kubernetes",
-        "desc": "Requests, limits and node pool utilization across clusters.",
+        "desc": "Pod requests against real usage, and how full each node pool is.",
     },
     {
         "kind": "terraform",
@@ -207,24 +207,24 @@ def validate_custom_url(url: str | None, *, allow_private: bool) -> str:
     from urllib.parse import urlsplit
 
     if not url:
-        raise ValueError("server URL is required")
+        raise ValueError("Add the server URL.")
     parts = urlsplit(url.strip())
     if parts.scheme not in ({"https", "http"} if allow_private else {"https"}):
-        raise ValueError("custom MCP servers must use https")
+        raise ValueError("Custom MCP servers have to use https.")
     if not parts.hostname:
-        raise ValueError("server URL has no host")
+        raise ValueError("That server URL has no host.")
     if parts.username or parts.password:
-        raise ValueError("put credentials in the Authorization header, not the URL")
+        raise ValueError("Put credentials in the Authorization header, not in the URL.")
     if not allow_private:
         host = parts.hostname
         if host == "localhost" or host.endswith((".localhost", ".internal", ".local")):
-            raise ValueError(f"{host} is not a public host")
+            raise ValueError(f"{host} isn't a public host.")
         try:
             ip = ipaddress.ip_address(host)
         except ValueError:
             ip = None
         if ip is not None and not ip.is_global:
-            raise ValueError(f"{host} is not a public address")
+            raise ValueError(f"{host} isn't a public address.")
     return url.strip()
 
 
@@ -233,22 +233,22 @@ def normalize_aws_accounts(accounts: object) -> list[dict[str, str]]:
     import re
 
     if not isinstance(accounts, list):
-        raise ValueError("accounts must be a list")
+        raise ValueError("Accounts have to be a list.")
     out: list[dict[str, str]] = []
     for a in accounts:
         item = {"role_arn": a} if isinstance(a, str) and a.startswith("arn:") else a
         if isinstance(item, str):
             item = {"account_id": item}
         if not isinstance(item, dict):
-            raise ValueError(f"invalid account {a!r}")
+            raise ValueError(f"{a!r} isn't a valid account.")
         arn = item.get("role_arn")
         if arn:
             m = re.fullmatch(r"arn:aws[a-z-]*:iam::(\d{12}):role/[\w+=,.@/-]+", arn)
             if not m:
-                raise ValueError(f"{arn} is not an IAM role ARN")
+                raise ValueError(f"{arn} isn't an IAM role ARN.")
             item = {**item, "account_id": m.group(1)}
         elif not re.fullmatch(r"\d{12}", str(item.get("account_id", ""))):
-            raise ValueError(f"{a!r} is not a role ARN or 12-digit account ID")
+            raise ValueError(f"{a!r} isn't a role ARN or a 12-digit account ID.")
         item.pop("external_id", None)  # always derived from the organization
         out.append(item)
     return out

@@ -13,3 +13,6 @@ mcp/dist/
 .env
 dist-live/
 .dev-logs/
+
+# builds
+dist-embed/

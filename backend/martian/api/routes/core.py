@@ -10,9 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from martian.api.deps import Principal, current_principal, require, tenant_db
-from martian.db.models import Action, AuditEntry, Finding, Role, Scan
+from martian.db.models import Action, AuditEntry, Finding, Integration, Resource, Role, Scan
 from martian.jobs.queue import enqueue
 from martian.services import findings as svc
+from martian.services.graph import finding_extras, service_key
 from martian.services.overview import finding_dict, overview
 
 router = APIRouter(tags=["core"])
@@ -35,8 +36,22 @@ async def list_findings(
         q = q.where(Finding.status.in_(["open", "approved", "running", "applied", "failed"]))
     elif status != "all":
         q = q.where(Finding.status == status)
-    rows = (await s.execute(q.order_by(Finding.est_monthly_savings.desc()))).scalars()
-    return {"findings": [finding_dict(f) for f in rows]}
+    rows = list((await s.execute(q.order_by(Finding.est_monthly_savings.desc()))).scalars())
+    kinds, res_node = await _placement(s, p.org_id, rows)
+    return {"findings": [{**finding_dict(f), **finding_extras(f, kinds, res_node)} for f in rows]}
+
+
+async def _placement(s: AsyncSession, org_id: uuid.UUID, rows: list[Finding]) -> tuple[dict, dict]:
+    """Integration kinds and map node ids for a set of findings."""
+    kinds = {str(i): k for i, k in (await s.execute(select(Integration.id, Integration.kind))).all()}
+    ids = {x for f in rows for x in (f.resource_ids or [])}
+    res_node: dict[str, str] = {}
+    if ids:
+        res = (
+            await s.execute(select(Resource).where(Resource.org_id == org_id, Resource.resource_id.in_(ids)))
+        ).scalars()
+        res_node = {r.resource_id: service_key(r) for r in res}
+    return kinds, res_node
 
 
 @router.get("/findings/{finding_id}")
@@ -45,11 +60,12 @@ async def get_finding(
 ) -> dict:
     f = await s.get(Finding, finding_id)
     if f is None:
-        raise HTTPException(404, "finding not found")
+        raise HTTPException(404, "That finding doesn't exist anymore.")
     actions = (
         await s.execute(select(Action).where(Action.finding_id == finding_id).order_by(Action.created_at))
     ).scalars()
-    return {**finding_dict(f), "actions": [_action(a) for a in actions]}
+    kinds, res_node = await _placement(s, p.org_id, [f])
+    return {**finding_dict(f), **finding_extras(f, kinds, res_node), "actions": [_action(a) for a in actions]}
 
 
 class DismissBody(BaseModel):
@@ -97,9 +113,9 @@ async def rollback(
 ) -> dict:
     a = await s.get(Action, action_id)
     if a is None:
-        raise HTTPException(404, "action not found")
+        raise HTTPException(404, "That change doesn't exist anymore.")
     if a.status != "succeeded" or not a.rollback:
-        raise HTTPException(409, "this action can't be rolled back")
+        raise HTTPException(409, "This change can't be rolled back.")
     await enqueue(
         s,
         "rollback_action",

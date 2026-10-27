@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from martian.agents.chat import close_checkpointer, get_checkpointer
-from martian.api.routes import auth, chat, core, integrations, internal, inventory, org, servers
+from martian.api.routes import agents, auth, chat, core, demo, integrations, internal, inventory, org, servers
 from martian.config import get_settings
 from martian.db.base import dispose_engine, get_engine
 from martian.services.findings import FindingStateError
@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[settings.web_origin],
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Authorization"],
     )
 
@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
             await conn.execute(text("SELECT 1"))
         return {"ok": True}
 
-    for r in (auth, core, inventory, integrations, servers, chat, org, internal):
+    for r in (auth, core, inventory, integrations, servers, chat, agents, demo, org, internal):
         app.include_router(r.router)
     return app
 

@@ -109,7 +109,7 @@ async def test_chat_offline_answers_with_savings(client, signed_in, backend, mon
     assert "tool_start" in names and names[-1] == "done"
     done = json.loads(events[-1].split(": ", 1)[1])
     ai = [m for m in done["messages"] if m["type"] == "ai"]
-    assert "Total Potential Monthly Savings" in ai[-1]["content"]
+    assert "You could save" in ai[-1]["content"] and "/mo" in ai[-1]["content"]
     assert done["run"] and done["run"][0]["tool"] == "list_findings"
 
 

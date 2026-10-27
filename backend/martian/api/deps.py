@@ -49,7 +49,7 @@ def _check_origin(request: Request) -> None:
     origin = request.headers.get("origin") or request.headers.get("referer", "")
     allowed = {get_settings().web_origin.rstrip("/"), get_settings().api_public_url.rstrip("/")}
     if origin and not any(origin.startswith(a) for a in allowed):
-        raise HTTPException(403, "cross-origin request blocked")
+        raise HTTPException(403, "This request came from another site, so Martian blocked it.")
 
 
 async def current_principal(request: Request) -> Principal:
@@ -60,7 +60,7 @@ async def current_principal(request: Request) -> Principal:
         token = auth[7:]
     claims = read_session(token) if token else None
     if not claims:
-        raise HTTPException(401, "not signed in")
+        raise HTTPException(401, "Sign in to continue.")
     user_id, org_id = uuid.UUID(claims["sub"]), uuid.UUID(claims["org"])
     async with system_session() as s:
         row = (
@@ -71,7 +71,7 @@ async def current_principal(request: Request) -> Principal:
             )
         ).first()
     if row is None:
-        raise HTTPException(401, "membership revoked")
+        raise HTTPException(401, "Your access to this organization was removed.")
     user, role = row
     return Principal(user.id, org_id, user.email, user.name, role, client_ip(request))
 
@@ -79,7 +79,7 @@ async def current_principal(request: Request) -> Principal:
 def require(role: Role):
     async def dep(p: Principal = Depends(current_principal)) -> Principal:
         if not p.at_least(role):
-            raise HTTPException(403, f"requires {role.value} role")
+            raise HTTPException(403, f"This needs the {role.value} role or higher.")
         return p
 
     return dep

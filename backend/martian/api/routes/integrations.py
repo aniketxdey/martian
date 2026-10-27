@@ -92,7 +92,7 @@ async def get_integration(
 ) -> dict:
     i = await s.get(Integration, integration_id)
     if i is None:
-        raise HTTPException(404, "integration not found")
+        raise HTTPException(404, "That integration doesn't exist.")
     calls = (
         await s.execute(
             select(Action).where(Action.integration_id == i.id).order_by(Action.created_at.desc()).limit(20)
@@ -136,7 +136,7 @@ async def create_integration(
     body: CreateIntegration, p: Principal = Depends(require(Role.admin)), s: AsyncSession = Depends(tenant_db)
 ) -> dict:
     if body.kind not in KINDS:
-        raise HTTPException(400, f"unknown integration kind {body.kind}")
+        raise HTTPException(400, f"Martian doesn't support the integration kind {body.kind!r}.")
     _check_config(body.kind, body.config)
     connectors = await _connectors(s, p.org_id)
     connector_id = body.connector_id
@@ -144,7 +144,7 @@ async def create_integration(
         if connector_id is None:
             connector_id = next(iter(connectors), None)
         if connector_id not in connectors:
-            raise HTTPException(400, "create a connector first, then attach this integration to it")
+            raise HTTPException(400, "Create a connector first, then attach this integration to it.")
     i = Integration(
         org_id=p.org_id,
         kind=body.kind,
@@ -189,7 +189,7 @@ async def update_integration(
 ) -> dict:
     i = await s.get(Integration, integration_id)
     if i is None:
-        raise HTTPException(404, "integration not found")
+        raise HTTPException(404, "That integration doesn't exist.")
     if body.config is not None:
         _check_config(i.kind, body.config)
     changes = body.model_dump(exclude_none=True, exclude={"secrets"})
@@ -224,7 +224,7 @@ async def delete_integration(
 ) -> dict:
     i = await s.get(Integration, integration_id)
     if i is None:
-        raise HTTPException(404, "integration not found")
+        raise HTTPException(404, "That integration doesn't exist.")
     connector_id, name = i.connector_id, i.name
     await s.delete(i)
     await audit.record(
@@ -247,7 +247,7 @@ async def test_integration(integration_id: uuid.UUID, p: Principal = Depends(req
     async with org_session(p.org_id) as s:
         i = await s.get(Integration, integration_id)
         if i is None:
-            raise HTTPException(404, "integration not found")
+            raise HTTPException(404, "That integration doesn't exist.")
         kind = i.kind
     try:
         tools = await backend.list_tools(str(integration_id))
@@ -354,7 +354,7 @@ async def revoke_connector(
 ) -> dict:
     c = await s.get(Connector, connector_id)
     if c is None:
-        raise HTTPException(404, "connector not found")
+        raise HTTPException(404, "That connector doesn't exist.")
     name = c.name
     await s.delete(c)
     await audit.record(

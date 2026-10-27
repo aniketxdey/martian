@@ -104,7 +104,7 @@ async def invite(
             sys.add(user)
             await sys.flush()
         if await sys.get(Membership, (p.org_id, user.id)) is not None:
-            raise HTTPException(409, "already a member")
+            raise HTTPException(409, "They're already a member.")
         sys.add(Membership(org_id=p.org_id, user_id=user.id, role=body.role))
         user_id = user.id
     await audit.record(
@@ -131,11 +131,11 @@ async def set_role(
     s: AsyncSession = Depends(tenant_db),
 ) -> dict:
     if body.role == "owner" and p.role != "owner":
-        raise HTTPException(403, "only an owner can grant owner")
+        raise HTTPException(403, "Only an owner can make someone else an owner.")
     async with system_session() as sys:
         m = await sys.get(Membership, (p.org_id, user_id))
         if m is None:
-            raise HTTPException(404, "member not found")
+            raise HTTPException(404, "That person isn't a member.")
         m.role = body.role
     await audit.record(
         s,
@@ -154,11 +154,11 @@ async def remove_member(
     user_id: uuid.UUID, p: Principal = Depends(require(Role.admin)), s: AsyncSession = Depends(tenant_db)
 ) -> dict:
     if user_id == p.user_id:
-        raise HTTPException(400, "you can't remove yourself")
+        raise HTTPException(400, "You can't remove yourself. Ask another owner to do it.")
     async with system_session() as sys:
         m = await sys.get(Membership, (p.org_id, user_id))
         if m is None:
-            raise HTTPException(404, "member not found")
+            raise HTTPException(404, "That person isn't a member.")
         await sys.delete(m)
     await audit.record(
         s,

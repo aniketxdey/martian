@@ -1,8 +1,8 @@
 # Deploying Martian
 
 Martian runs as a hosted control plane. Each customer installs one **connector**
-inside their network. The connector dials out over TLS, so customers need no inbound
-firewall rules, VPN or shared cloud keys.
+inside their network. The connector dials out over TLS, so customers don't open
+inbound ports or share cloud keys.
 
 ## 1. Control plane on AWS
 

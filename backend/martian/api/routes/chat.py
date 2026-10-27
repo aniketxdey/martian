@@ -1,9 +1,10 @@
-"""Ask Martian: threads, streaming turns (SSE) and approval resumes."""
+"""Chat: threads, streaming turns (SSE) and approval resumes."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -23,7 +24,7 @@ async def _own_thread(p: Principal, thread_id: uuid.UUID) -> ChatThread:
     async with org_session(p.org_id) as s:
         t = await s.get(ChatThread, thread_id)
     if t is None or (t.user_id != p.user_id and not p.at_least(Role.admin)):
-        raise HTTPException(404, "conversation not found")
+        raise HTTPException(404, "That conversation doesn't exist anymore.")
     return t
 
 
@@ -44,20 +45,43 @@ async def list_threads(
     }
 
 
+class ThreadContext(BaseModel):
+    """What a conversation is about. Quick Chat sends kind=quick; the chat beside an agent run
+    sends kind=session with the run's id and title."""
+
+    kind: Literal["quick", "session"] = "quick"
+    session_id: str | None = Field(default=None, max_length=120)
+    session_title: str | None = Field(default=None, max_length=300)
+
+
+class ThreadBody(BaseModel):
+    context: ThreadContext | None = None
+
+
 @router.post("/threads", status_code=201)
 async def create_thread(
-    p: Principal = Depends(current_principal), s: AsyncSession = Depends(tenant_db)
+    body: ThreadBody | None = None,
+    p: Principal = Depends(current_principal),
+    s: AsyncSession = Depends(tenant_db),
 ) -> dict:
-    t = ChatThread(org_id=p.org_id, user_id=p.user_id)
+    context = body.context.model_dump(exclude_none=True) if body and body.context else {}
+    t = ChatThread(org_id=p.org_id, user_id=p.user_id, context=context)
+    if context.get("kind") == "session" and context.get("session_title"):
+        t.title = f"About: {context['session_title']}"[:300]
     s.add(t)
     await s.flush()
-    return {"id": str(t.id), "title": t.title}
+    return {"id": str(t.id), "title": t.title, "context": context}
 
 
 @router.get("/threads/{thread_id}")
 async def get_thread(thread_id: uuid.UUID, p: Principal = Depends(current_principal)) -> dict:
     t = await _own_thread(p, thread_id)
-    return {"id": str(t.id), "title": t.title, **(await thread_view(p.org_id, thread_id))}
+    return {
+        "id": str(t.id),
+        "title": t.title,
+        "context": t.context or {},
+        **(await thread_view(p.org_id, thread_id)),
+    }
 
 
 class MessageBody(BaseModel):
@@ -93,5 +117,5 @@ async def resume(thread_id: uuid.UUID, body: ResumeBody, p: Principal = Depends(
     await _own_thread(p, thread_id)
     view = await thread_view(p.org_id, thread_id)
     if not view["pending_approval"]:
-        raise HTTPException(409, "nothing is waiting for approval")
+        raise HTTPException(409, "Nothing is waiting for approval.")
     return _stream(run_turn(p.org_id, thread_id, p.as_dict(), resume=body.model_dump()))

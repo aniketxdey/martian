@@ -26,20 +26,20 @@ def is_write_tool(integration: Integration, tool: str) -> bool:
 
 def check_write_allowed(integration: Integration, tool: str) -> None:
     if not integration.enabled:
-        raise PolicyError(f"{integration.name} is disabled")
+        raise PolicyError(f"{integration.name} is turned off.")
     if integration.mode == PermissionMode.read.value:
-        raise PolicyError(f"{integration.name} is read-only; change its permission mode to allow changes")
+        raise PolicyError(f"{integration.name} is read-only. Change its permission mode to allow changes.")
     if tool in (integration.disabled_tools or []):
-        raise PolicyError(f"Tool {tool} is turned off for {integration.name}")
+        raise PolicyError(f"The {tool} tool is turned off for {integration.name}.")
     if integration.tools and tool_meta(integration, tool) is None:
-        raise PolicyError(f"{integration.name} does not provide the tool {tool}")
+        raise PolicyError(f"{integration.name} doesn't have a tool called {tool}.")
 
 
 def check_read_allowed(integration: Integration, tool: str) -> None:
     if not integration.enabled:
-        raise PolicyError(f"{integration.name} is disabled")
+        raise PolicyError(f"{integration.name} is turned off.")
     if tool in (integration.disabled_tools or []):
-        raise PolicyError(f"Tool {tool} is turned off for {integration.name}")
+        raise PolicyError(f"The {tool} tool is turned off for {integration.name}.")
 
 
 def auto_approve_limit(org: Organization) -> Decimal:
@@ -58,4 +58,4 @@ def can_auto_approve(
 
 def require_role(role: str, minimum: Role) -> None:
     if Role(role).rank < minimum.rank:
-        raise PolicyError(f"Requires {minimum.value} role")
+        raise PolicyError(f"This needs the {minimum.value} role or higher.")

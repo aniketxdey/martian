@@ -1,9 +1,10 @@
 # Martian
 
-Agentic infrastructure optimization. Martian finds idle and oversized resources across
-AWS, Azure, Google Cloud, VMware and on‑premises servers, explains the savings, and
-applies changes after a person approves them. It also scales ahead of demand using an
-LSTM workload forecast.
+**Agents That Eliminate Your Infrastructure Waste**
+
+Martian's agents find idle and oversized resources across AWS, Azure, Google Cloud,
+VMware and on‑premises servers, then make the change once a person has seen what it
+costs and approved it. They also scale ahead of demand with an LSTM workload forecast.
 
 **Stack:** Python (FastAPI, LangGraph, SQLAlchemy, PyTorch) · Node.js (MCP servers,
 connector, gateway) · React + TypeScript console · Postgres · Claude as the reasoning
@@ -25,14 +26,16 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and
 
 - **Discovers** inventory and 14‑day utilization through MCP tools that run on a
   connector inside the customer's network, using the customer's own cloud identity.
-- **Finds waste** with deterministic, tested rules: idle compute, unattached volumes,
-  old snapshots, oversized databases, idle load balancers and NAT gateways,
-  underused hosts, duplicate data, and forecast‑driven autoscaling changes.
+- **Finds waste** with deterministic, tested rules. Idle compute and unattached volumes
+  are the common ones; the rules also catch oversized databases, underused hosts,
+  duplicate data and autoscaling groups the forecast says are too big.
 - **Applies approved changes** as plans of MCP write calls. Each step records how to
   undo it. If a step fails, the earlier steps roll back. Integrations run in
   `read`, `ask` or `auto` (low‑risk only) mode.
-- **Answers questions** in Ask Martian, a LangGraph agent with Claude. It uses the same
-  tools, and write calls pause for an approval card.
+- **Answers questions** in Quick Chat, a LangGraph agent with Claude. It uses the same
+  tools, and write calls pause for an approval card. Every chat turn that calls tools
+  becomes an agent run you can open on the **Agents** page: a map of what each agent
+  touched and the full step‑by‑step trace, with a chat scoped to that run beside it.
 - **Records everything** in a hash‑chained, append‑only audit log.
 
 ## Run it locally
@@ -67,27 +70,48 @@ MARTIAN_SANDBOX=true MARTIAN_CONNECTOR_TOKEN=mct_demo_sandbox_connector_token_do
 cd .. && npm install && VITE_API_URL=/api npm run dev
 ```
 
-`npm run dev` without `VITE_API_URL` runs the console on built‑in demo data.
+`npm run dev` without `VITE_API_URL` runs the console on generated demo data with a
+local chat planner, no backend needed.
+
+### Demo data
+
+With `MARTIAN_DEMO_MODE=true` (the default in `.env.example`, `scripts/dev.sh` and
+docker compose) the console generates one of five sample companies with a fresh seed on
+each visit, and every number keeps moving while you watch. Before each chat turn it
+uploads a snapshot of that world (`PUT /demo/snapshot`), and the chat agent answers from
+it, so Claude talks about what's on screen. Set it to `false` to show real inventory.
+
+- `?variant=2` (1–5, or a name such as `helix`) and `?seed=123` pin the world.
+- Settings → Demo data switches company or seed.
+
+### Embedded demo
+
+`npm run build:embed` writes a static, sign‑in‑free copy of the console to
+`dist-embed/` with a fixed seed. It uses relative paths, so it works from any sub‑path
+such as `/demo-app/`. See [docs/EMBED.md](docs/EMBED.md).
 
 ## Repository
 
 | Path | What |
 | --- | --- |
-| `src/` | Console (React, Vite, Tailwind). `src/state/useLiveData.ts` etc. talk to the API |
+| `src/app` | Console data layer: `DemoStore` (generated world) and `LiveStore` (API), router with page transitions, chat hook, appearance settings |
+| `src/demo` | Demo engine: five company templates, seeded generator, the tick that moves it, agent run timelines, local chat planner |
+| `src/views` | One file per page, plus the agent run page (`AgentSession.tsx`) |
 | `backend/martian/api` | FastAPI routes: auth/SSO, findings, approvals, integrations, connectors, chat (SSE), audit |
-| `backend/martian/agents` | LangGraph chat graph with the approval gate, tool loading over MCP |
+| `backend/martian/agents` | LangGraph chat graph with the approval gate, tool loading over MCP, demo tools, `skills/` appended to the system prompt |
 | `backend/martian/scans` | Inventory collection and findings rules |
-| `backend/martian/jobs` | Postgres job queue, worker and scheduler |
-| `backend/martian/forecast` | PyTorch LSTM, training script, weights and the MCP server |
+| `backend/martian/jobs` | Postgres job queue and the worker that also schedules scans |
+| `backend/martian/forecast` | PyTorch LSTM with its training script and weights, served as MCP tools |
 | `backend/migrations` | Alembic, including row‑level security policies |
 | `mcp/src` | MCP servers per provider, sandbox provider, connector, gateway |
 | `deploy/` | Terraform (AWS), connector Helm chart, customer onboarding templates, nginx |
 | `.github/workflows` | CI (lint, tests, builds, infra checks) and deploy |
+| `.claude/skills` | Writing skills (anti‑AI‑slop and rewrite) used for every user‑facing string |
 
 ## Tests
 
 ```bash
 cd backend && uv run pytest        # needs Postgres; MARTIAN_TEST_PG overrides the admin URL
 cd mcp && npm test
-npx tsc --noEmit && npx vite build
+npx tsc --noEmit && npx vite build && npm run build:embed
 ```

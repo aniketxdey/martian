@@ -9,17 +9,18 @@ export { cx };
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
 type BtnSize = 'sm' | 'md' | 'lg';
 
+// Every button hovers into the accent; buttons that are already filled lift instead (index.css).
 const btnVariant: Record<BtnVariant, string> = {
-  primary: 'bg-accent text-white font-semibold border-0',
-  secondary: 'bg-white text-fg font-medium border border-line-strong',
-  ghost: 'bg-transparent text-fg-body font-medium border-0',
-  danger: 'bg-danger text-white font-semibold border-0',
-  dangerOutline: 'bg-white text-danger font-medium border border-danger-line',
+  primary: 'ix-btn-primary bg-accent text-white font-semibold border-0',
+  secondary: 'ix-btn bg-surface text-fg font-medium border border-line-strong',
+  ghost: 'ix-btn bg-transparent text-fg-body font-medium border border-transparent',
+  danger: 'ix-btn-primary bg-danger text-white font-semibold border-0',
+  dangerOutline: 'ix-btn bg-surface text-danger font-medium border border-danger-line',
 };
 const btnSize: Record<BtnSize, string> = {
-  sm: 'h-9 px-3.5 text-[13px] rounded-lg',
+  sm: 'h-9 px-3.5 text-13 rounded-lg',
   md: 'h-11 px-4 text-sm rounded-lg',
-  lg: 'h-12 px-4 text-[15px] rounded-lg',
+  lg: 'h-12 px-4 text-15 rounded-lg',
 };
 
 export const Button = ({
@@ -39,7 +40,7 @@ export const IconButton = ({ label, className, children, ...rest }: React.Button
     type="button"
     aria-label={label}
     {...rest}
-    className={cx('flex h-9 w-9 items-center justify-center rounded-lg border-0 bg-transparent text-fg-body', className)}
+    className={cx('ix-btn flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-transparent text-fg-body', className)}
   >
     {children}
   </button>
@@ -53,7 +54,7 @@ const badgeTone: Record<BadgeTone, string> = {
   warn: 'text-warn-ink bg-warn-wash',
   accent: 'text-accent-ink bg-accent-wash',
   neutral: 'text-fg-body bg-line-soft',
-  soon: 'text-fg-body border border-dashed border-[#C8C9C6] !py-[3px] !px-[9px]',
+  soon: 'text-fg-body border border-dashed border-line-strong !py-[3px] !px-[9px]',
 };
 export const Badge = ({ tone, dot, children, className }: { tone: BadgeTone; dot?: boolean; children: React.ReactNode; className?: string }) => (
   <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium', badgeTone[tone], className)}>
@@ -79,7 +80,7 @@ export const Toggle = ({
     <span
       className={cx('box-border flex rounded-full p-0.5', on ? 'justify-end bg-accent' : 'justify-start bg-line-strong', small ? 'h-5 w-[34px]' : 'h-[22px] w-[38px]')}
     >
-      <span className={cx('rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]', small ? 'h-4 w-4' : 'h-[18px] w-[18px]')} />
+      <span className={cx('rounded-full bg-[#fff] shadow-[0_1px_2px_rgba(0,0,0,0.25)]', small ? 'h-4 w-4' : 'h-[18px] w-[18px]')} />
     </span>
   </button>
 );
@@ -101,7 +102,8 @@ export function SegTabs<K extends string>({ items, value, onChange, label }: { i
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.key)}
-            className={cx('h-[34px] rounded-[7px] border-0 px-3.5 text-[13px] font-medium', active ? 'bg-white text-fg shadow-tab' : 'bg-transparent text-fg-body')}
+            style={{ '--ix-ul-inset': '12px', '--ix-ul-bottom': '4px' } as React.CSSProperties}
+            className={cx('ix-underline h-[34px] rounded-[7px] border-0 px-3.5 text-13 font-medium transition-colors hover:text-fg', active ? 'bg-surface text-fg shadow-tab' : 'bg-transparent text-fg-body')}
           >
             {t.label}
           </button>
@@ -124,7 +126,8 @@ export function LineTabs<K extends string>({ items, value, onChange, label }: { 
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.key)}
-            className={cx('-mb-px h-11 border-0 border-b-2 bg-transparent px-0.5 text-sm', active ? 'border-accent font-semibold text-fg' : 'border-transparent font-medium text-fg-muted')}
+            style={{ '--ix-ul-bottom': '-1px' } as React.CSSProperties}
+            className={cx('ix-underline -mb-px h-11 border-0 bg-transparent px-0.5 text-sm transition-colors hover:text-fg', active ? 'font-semibold text-fg' : 'font-medium text-fg-muted')}
           >
             {t.label}
           </button>
@@ -137,27 +140,27 @@ export function LineTabs<K extends string>({ items, value, onChange, label }: { 
 /* ---------- Cards and stats ---------- */
 
 export const Card = ({ className, children, as: Tag = 'div' }: { className?: string; children: React.ReactNode; as?: any }) => (
-  <Tag className={cx('rounded-xl border border-line bg-white', className)}>{children}</Tag>
+  <Tag className={cx('ix-card rounded-xl border border-line bg-surface', className)}>{children}</Tag>
 );
 
 export const Stat = ({ label, value, sub, valueClass, children }: { label: string; value: React.ReactNode; sub?: React.ReactNode; valueClass?: string; children?: React.ReactNode }) => (
   <Card className="flex flex-col gap-2.5 px-[22px] py-5">
-    <span className="text-[13px] text-fg-muted">{label}</span>
-    <span className={cx('font-mono text-[30px] font-medium tracking-[-0.02em]', valueClass)}>{value}</span>
-    {sub && <span className="text-[13px] text-fg-muted">{sub}</span>}
+    <span className="text-13 text-fg-muted">{label}</span>
+    <span className={cx('font-mono text-30 font-medium tracking-[-0.02em]', valueClass)}>{value}</span>
+    {sub && <span className="text-13 text-fg-muted">{sub}</span>}
     {children}
   </Card>
 );
 
 /* ---------- Form fields ---------- */
 
-export const fieldInput = 'box-border h-[42px] w-full rounded-lg border border-line-strong bg-white px-3 text-sm text-fg outline-none';
+export const fieldInput = 'box-border h-[42px] w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-fg outline-none';
 
 export const Field = ({ id, label, hint, className, children }: { id: string; label: React.ReactNode; hint?: React.ReactNode; className?: string; children: React.ReactNode }) => (
   <div className={cx('flex flex-col gap-1.5', className)}>
-    <label htmlFor={id} className="text-[13px] font-medium">{label}</label>
+    <label htmlFor={id} className="text-13 font-medium">{label}</label>
     {children}
-    {hint && <span className="text-[13px] text-fg-muted">{hint}</span>}
+    {hint && <span className="text-13 text-fg-muted">{hint}</span>}
   </div>
 );
 
@@ -180,13 +183,13 @@ export const Drawer = ({
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-[rgba(10,10,11,0.32)]">
       <button type="button" aria-label={`Close ${label}`} onClick={onClose} className="flex-1 cursor-default border-0 bg-transparent" />
-      <section role="dialog" aria-modal="true" aria-label={label} className="flex max-w-full flex-col overflow-y-auto bg-white shadow-drawer" style={{ width }}>
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-white px-6 py-[18px]">
+      <section role="dialog" aria-modal="true" aria-label={label} className="flex max-w-full flex-col overflow-y-auto bg-surface shadow-drawer" style={{ width }}>
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-surface px-6 py-[18px]">
           <div className="min-w-0 flex-1">{header}</div>
           <IconButton label="Close" onClick={onClose}><IconClose /></IconButton>
         </div>
         <div className="flex-1">{children}</div>
-        {footer && <div className="sticky bottom-0 mt-auto flex justify-end gap-2.5 border-t border-line bg-white px-6 py-4">{footer}</div>}
+        {footer && <div className="sticky bottom-0 mt-auto flex justify-end gap-2.5 border-t border-line bg-surface px-6 py-4">{footer}</div>}
       </section>
     </div>
   );
@@ -199,7 +202,7 @@ export const Dialog = ({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[rgba(10,10,11,0.4)] px-4 py-24">
-      <section role="dialog" aria-modal="true" aria-label={label} className="flex max-w-full flex-col rounded-2xl bg-white shadow-dialog" style={{ width }}>
+      <section role="dialog" aria-modal="true" aria-label={label} className="flex max-w-full flex-col rounded-2xl bg-surface shadow-dialog" style={{ width }}>
         <div className="flex items-start justify-between gap-3 border-b border-line px-6 py-5">
           <div className="min-w-0 flex-1">{header}</div>
           <IconButton label="Close" onClick={onClose} className="flex-none"><IconClose /></IconButton>

@@ -24,6 +24,8 @@ x-control-plane-env: &cp-env
   MARTIAN_WORKOS_API_KEY: ${MARTIAN_WORKOS_API_KEY:-}
   MARTIAN_WORKOS_CLIENT_ID: ${MARTIAN_WORKOS_CLIENT_ID:-}
   MARTIAN_ALLOW_PRIVATE_EGRESS: ${MARTIAN_ALLOW_PRIVATE_EGRESS:-false}
+  # Generated demo data in the console and the chat agent (see .env.example).
+  MARTIAN_DEMO_MODE: ${MARTIAN_DEMO_MODE:-true}
 
 services:
   postgres:

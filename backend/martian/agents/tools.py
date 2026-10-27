@@ -37,7 +37,7 @@ class AgentToolset:
 
 def _internal_tools(org_id: uuid.UUID) -> list[BaseTool]:
     async def get_overview() -> str:
-        """Current monthly cost, waste identified, open findings, resource count and health score."""
+        """Monthly cost and the waste found so far, plus resource counts and the health score."""
         async with org_session(org_id) as s:
             return json.dumps(await overview(s, org_id))
 
@@ -150,24 +150,33 @@ def _server_names(integrations: list[Integration]) -> dict[str, str]:
 
 
 async def load_toolset(org_id: uuid.UUID, include_mcp: bool = True) -> AgentToolset:
-    tools = _internal_tools(org_id)
+    demo = get_settings().demo_mode
+    if demo:
+        from martian.agents.demo_tools import demo_tools
+
+        tools = demo_tools(org_id)
+    else:
+        tools = _internal_tools(org_id)
     info: dict[str, ToolInfo] = {t.name: ToolInfo(write=False) for t in tools}
     info["approve_finding"] = ToolInfo(write=True, integration_name="Martian")
     if not include_mcp:
         return AgentToolset(tools, info)
 
-    async with org_session(org_id) as s:
-        integrations = list(
-            (
-                await s.execute(
-                    select(Integration).where(
-                        Integration.org_id == org_id,
-                        Integration.enabled.is_(True),
-                        Integration.status == "connected",
+    # Demo mode answers from the console's snapshot; only the forecast service stays real.
+    integrations: list[Integration] = []
+    if not demo:
+        async with org_session(org_id) as s:
+            integrations = list(
+                (
+                    await s.execute(
+                        select(Integration).where(
+                            Integration.org_id == org_id,
+                            Integration.enabled.is_(True),
+                            Integration.status == "connected",
+                        )
                     )
-                )
-            ).scalars()
-        )
+                ).scalars()
+            )
     names = _server_names(integrations)
     connections: dict[str, Any] = {
         names[str(i.id)]: {

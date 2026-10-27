@@ -77,6 +77,9 @@ class Settings(BaseSettings):
 
     # Demo tenant bootstrap.
     seed_demo: bool = False
+    # Generated demo data: the console builds a sample company in the browser and the chat
+    # agent reads that snapshot instead of real integrations. Off unless MARTIAN_DEMO_MODE=true.
+    demo_mode: bool = False
 
     @field_validator(
         "anthropic_api_key", "workos_api_key", "workos_client_id", "encryption_key", "kms_key_id"

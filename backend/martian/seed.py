@@ -116,7 +116,7 @@ async def main() -> None:
         org = await seed_demo()
     else:
         if not (a.org and a.email and a.password):
-            p.error("--org, --email and --password are required (or use --demo)")
+            p.error("Pass --org with --email and --password, or use --demo")
         org = await create_org(a.org, a.email, a.password, a.domain)
     print(f"organization ready: {org.name} ({org.id})")
 
